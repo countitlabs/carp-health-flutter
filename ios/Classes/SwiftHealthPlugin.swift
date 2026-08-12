@@ -73,11 +73,17 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
         case "getDataByUUID":
             healthDataReader.getDataByUUID(call: call, result: result)
 
+        case "getWorkoutRoute":
+            healthDataReader.getWorkoutRoute(call: call, result: result)
+
         case "getIntervalData":
             healthDataReader.getIntervalData(call: call, result: result)
 
         case "getTotalStepsInInterval":
             healthDataReader.getTotalStepsInInterval(call: call, result: result)
+
+        case "getTotalDistanceInterval":
+            healthDataReader.getTotalDistanceInterval(call: call, result: result)
 
         case "writeData":
             do {
@@ -164,13 +170,7 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
             }
 
         case "delete":
-            do {
-                healthDataOperations.delete(call: call, result: result)
-            } catch {
-                result(FlutterError(code: "DELETE_ERROR",
-                                    message: "Error deleting data: \(error.localizedDescription)",
-                                    details: nil))
-            }
+            healthDataOperations.delete(call: call, result: result)
 
         case "deleteByUUID":
             do {
@@ -633,6 +633,8 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
         workoutActivityTypeMap["BOXING"] = .boxing
         workoutActivityTypeMap["KICKBOXING"] = .kickboxing
         workoutActivityTypeMap["MARTIAL_ARTS"] = .martialArts
+        workoutActivityTypeMap["MIXED_MARTIAL_ARTS"] = .martialArts
+        workoutActivityTypeMap["AEROBICS"] = .mixedCardio
         workoutActivityTypeMap["TAI_CHI"] = .taiChi
         workoutActivityTypeMap["WRESTLING"] = .wrestling
         workoutActivityTypeMap["OTHER"] = .other

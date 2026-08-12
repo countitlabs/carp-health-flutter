@@ -1,7 +1,20 @@
 part of '../health.dart';
 
 /// Types of health platforms.
-enum HealthPlatformType { appleHealth, googleHealthConnect }
+enum HealthPlatformType {
+  appleHealth,
+  // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ----------------------------------
+  googleFit,
+  // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ------------------------------------
+  googleHealthConnect,
+}
+
+// GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ------------------------------------
+/// Android health backend used by a [Health] instance.
+///
+/// Remove this selector when Android has only the Health Connect backend.
+enum AndroidHealthProvider { googleFit, healthConnect }
+// GOOGLE FIT TEMPORARY SUPPORT - REMOVE END --------------------------------------
 
 /// A [HealthDataPoint] object corresponds to a data point capture from
 /// Apple HealthKit or Google Health Connect with a [HealthValue]
@@ -37,6 +50,11 @@ class HealthDataPoint {
 
   /// The id of the device from which the data point was fetched.
   String sourceDeviceId;
+
+  /// Backwards-compatible alias for [sourceDeviceId].
+  String get deviceId => sourceDeviceId;
+
+  set deviceId(String value) => sourceDeviceId = value;
 
   /// The id of the source from which the data point was fetched.
   String sourceId;
@@ -108,7 +126,17 @@ class HealthDataPoint {
   Map<String, dynamic> toJson() => _$HealthDataPointToJson(this);
 
   /// Create a [HealthDataPoint] based on a health data point from native data format.
-  factory HealthDataPoint.fromHealthDataPoint(HealthDataType dataType, dynamic dataPoint, String? unitName) {
+  factory HealthDataPoint.fromHealthDataPoint(
+    HealthDataType dataType,
+    dynamic dataPoint,
+    String? unitName, {
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START --------------------------------
+    // These overrides let separate Google Fit and Health Connect instances stamp
+    // the correct provider. Remove sourcePlatform with the multi-provider selector.
+    HealthPlatformType? sourcePlatform,
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ----------------------------------
+    String? sourceDeviceId,
+  }) {
     // Handling different [HealthValue] types
     HealthValue value = switch (dataType) {
       HealthDataType.AUDIOGRAM => AudiogramHealthValue.fromHealthDataPoint(dataPoint),
@@ -155,8 +183,11 @@ class HealthDataPoint {
       unit: unit,
       dateFrom: from,
       dateTo: to,
-      sourcePlatform: Health().platformType,
-      sourceDeviceId: Health().deviceId,
+      // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ------------------------------
+      // Restore `Health().platformType` directly after removing its override.
+      sourcePlatform: sourcePlatform ?? Health().platformType,
+      // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END --------------------------------
+      sourceDeviceId: sourceDeviceId ?? Health().deviceId,
       sourceId: sourceId,
       sourceName: sourceName,
       recordingMethod: RecordingMethod.fromInt(recordingMethod),

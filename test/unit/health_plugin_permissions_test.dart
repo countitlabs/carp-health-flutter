@@ -79,9 +79,12 @@ void main() {
       expect(args['permissions'], [HealthDataAccess.READ.index]);
     });
 
-    test('revokePermissions calls channel', () async {
-      await ctx.health.revokePermissions();
+    test('revokePermissions returns the native result', () async {
+      ctx.channel.when('revokePermissions', true);
 
+      final revoked = await ctx.health.revokePermissions();
+
+      expect(revoked, isTrue);
       final call = ctx.channel.lastCallFor('revokePermissions');
       expect(call, isNotNull);
     });

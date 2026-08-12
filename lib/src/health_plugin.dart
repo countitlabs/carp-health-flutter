@@ -37,23 +37,47 @@ part of '../health.dart';
 /// **Note** that you should check the availability of GHC before using any setter
 /// or getter methods. Otherwise, the plugin will throw an exception.
 class Health {
-  static const MethodChannel _channel = MethodChannel('flutter_health');
+  // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ----------------------------------
+  // Replace these names with a single static `MethodChannel('flutter_health')`
+  // after removing Google Fit.
+  static const String _healthConnectChannelName = 'flutter_health';
+  static const String _googleFitChannelName = 'flutter_health/google_fit';
+  // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ------------------------------------
 
   String? _deviceId;
   final DeviceInfoPlugin _deviceInfo;
+  // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ----------------------------------
+  final AndroidHealthProvider androidProvider;
+  final MethodChannel _channel;
+  // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ------------------------------------
   HealthConnectSdkStatus _healthConnectSdkStatus = HealthConnectSdkStatus.sdkUnavailable;
 
   /// Get an instance of the health plugin.
-  Health({DeviceInfoPlugin? deviceInfo}) : _deviceInfo = deviceInfo ?? DeviceInfoPlugin() {
+  // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ----------------------------------
+  // Restore the Health Connect-only constructor when this selector is removed.
+  Health({DeviceInfoPlugin? deviceInfo, this.androidProvider = AndroidHealthProvider.healthConnect})
+    : _deviceInfo = deviceInfo ?? DeviceInfoPlugin(),
+      _channel = MethodChannel(
+        Platform.isAndroid && androidProvider == AndroidHealthProvider.googleFit
+            ? _googleFitChannelName
+            : _healthConnectChannelName,
+      ) {
     _registerFromJsonFunctions();
   }
+  // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ------------------------------------
 
   /// The latest status on availability of Health Connect SDK on this phone.
   HealthConnectSdkStatus get healthConnectSdkStatus => _healthConnectSdkStatus;
 
   /// The type of platform of this device.
-  HealthPlatformType get platformType =>
-      Platform.isIOS ? HealthPlatformType.appleHealth : HealthPlatformType.googleHealthConnect;
+  // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ----------------------------------
+  // Android can return googleFit only while both native providers coexist.
+  HealthPlatformType get platformType => Platform.isIOS
+      ? HealthPlatformType.appleHealth
+      : androidProvider == AndroidHealthProvider.googleFit
+      ? HealthPlatformType.googleFit
+      : HealthPlatformType.googleHealthConnect;
+  // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ------------------------------------
 
   /// The id of this device.
   ///
@@ -75,7 +99,10 @@ class Health {
   /// Check if a given data type is available on this device.
   /// Currently only needed for Android Skin Temperature support.
   Future<void> _checkIfDataTypeAvailableOnDevice(HealthDataType dataType) async {
-    if (!Platform.isAndroid) return;
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START --------------------------------
+    // Replace with `if (!Platform.isAndroid) return;` after Google Fit removal.
+    if (!Platform.isAndroid || androidProvider == AndroidHealthProvider.googleFit) return;
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ----------------------------------
 
     if (dataType == HealthDataType.SKIN_TEMPERATURE) {
       final available = await isSkinTemperatureAvailable();
@@ -138,14 +165,15 @@ class Health {
   /// Not implemented on iOS as there is no way to programmatically remove access.
   ///
   /// Android only. On iOS this does nothing.
-  Future<void> revokePermissions() async {
-    if (Platform.isIOS) return;
+  Future<bool> revokePermissions() async {
+    if (Platform.isIOS) return false;
 
     await _checkIfHealthConnectAvailableOnAndroid();
     try {
-      await _channel.invokeMethod('revokePermissions');
+      return await _channel.invokeMethod<bool>('revokePermissions') ?? false;
     } catch (e) {
       debugPrint('$runtimeType - Exception in revokePermissions(): $e');
+      return false;
     }
   }
 
@@ -156,7 +184,10 @@ class Health {
   ///
   /// Android only. Returns null on iOS or if an error occurs.
   Future<HealthConnectSdkStatus?> getHealthConnectSdkStatus() async {
-    if (Platform.isIOS) return null;
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START --------------------------------
+    // Remove the provider clause after Google Fit removal.
+    if (Platform.isIOS || androidProvider == AndroidHealthProvider.googleFit) return null;
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ----------------------------------
 
     try {
       final status = await _channel.invokeMethod<int>('getHealthConnectSdkStatus');
@@ -182,7 +213,10 @@ class Health {
   ///
   /// Android only. On iOS this does nothing.
   Future<void> installHealthConnect() async {
-    if (Platform.isIOS) return;
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START --------------------------------
+    // Remove the provider clause after Google Fit removal.
+    if (Platform.isIOS || androidProvider == AndroidHealthProvider.googleFit) return;
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ----------------------------------
 
     try {
       await _channel.invokeMethod('installHealthConnect');
@@ -195,7 +229,10 @@ class Health {
   /// if not.
   /// Internal methods used to check availability before any getter or setter methods.
   Future<void> _checkIfHealthConnectAvailableOnAndroid() async {
-    if (!Platform.isAndroid) return;
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START --------------------------------
+    // Replace with `if (!Platform.isAndroid) return;` after Google Fit removal.
+    if (!Platform.isAndroid || androidProvider == AndroidHealthProvider.googleFit) return;
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ----------------------------------
 
     if (!(await isHealthConnectAvailable())) {
       throw UnsupportedError(
@@ -1241,10 +1278,7 @@ class Health {
   /// Fetch the next page of changes for a previously created token.
   ///
   /// Android only. Returns null on iOS or if an error occurs.
-  Future<HealthChangesResponse?> getChanges({
-    required String changesToken,
-    bool includeSelf = false,
-  }) async {
+  Future<HealthChangesResponse?> getChanges({required String changesToken, bool includeSelf = false}) async {
     if (Platform.isIOS) return null;
 
     await _checkIfHealthConnectAvailableOnAndroid();
@@ -1454,7 +1488,19 @@ class Health {
     String? unit = message["unit"] as String?;
 
     return dataPoints
-        .map<HealthDataPoint>((dataPoint) => HealthDataPoint.fromHealthDataPoint(dataType, dataPoint, unit))
+        .map<HealthDataPoint>(
+          (dataPoint) => HealthDataPoint.fromHealthDataPoint(
+            dataType,
+            dataPoint,
+            unit,
+            // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ------------------------
+            // These overrides distinguish points returned by the two Android
+            // provider instances. The platform override can be removed with Google Fit.
+            sourcePlatform: platformType,
+            // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END --------------------------
+            sourceDeviceId: deviceId,
+          ),
+        )
         .toList();
   }
 
@@ -1471,6 +1517,26 @@ class Health {
     };
     final stepsCount = await _channel.invokeMethod<int?>('getTotalStepsInInterval', args);
     return stepsCount;
+  }
+
+  /// Gets cumulative walking and running distance for an interval on iOS.
+  Future<double?> getTotalDistanceInterval(DateTime startTime, DateTime endTime) async {
+    if (!Platform.isIOS) {
+      throw UnsupportedError('getTotalDistanceInterval is only supported on iOS');
+    }
+    return _channel.invokeMethod<double?>('getTotalDistanceInterval', {
+      'startTime': startTime.millisecondsSinceEpoch,
+      'endTime': endTime.millisecondsSinceEpoch,
+    });
+  }
+
+  /// Gets the GPS route associated with an exact HealthKit workout UUID.
+  Future<WorkoutRouteHealthValue?> getWorkoutRoute(String workoutUuid) async {
+    if (!Platform.isIOS) {
+      throw UnsupportedError('getWorkoutRoute is only supported on iOS');
+    }
+    final route = await _channel.invokeMapMethod<String, dynamic>('getWorkoutRoute', {'workoutUUID': workoutUuid});
+    return route == null ? null : WorkoutRouteHealthValue.fromJson(route);
   }
 
   /// Assigns numbers to specific [HealthDataType]s.
@@ -1610,6 +1676,7 @@ class Health {
   bool _isOnIOS(HealthWorkoutActivityType type) {
     // Returns true if the type is part of the iOS set
     return {
+      HealthWorkoutActivityType.AEROBICS,
       HealthWorkoutActivityType.AMERICAN_FOOTBALL,
       HealthWorkoutActivityType.ARCHERY,
       HealthWorkoutActivityType.AUSTRALIAN_FOOTBALL,
@@ -1649,6 +1716,7 @@ class Health {
       HealthWorkoutActivityType.KICKBOXING,
       HealthWorkoutActivityType.LACROSSE,
       HealthWorkoutActivityType.MARTIAL_ARTS,
+      HealthWorkoutActivityType.MIXED_MARTIAL_ARTS,
       HealthWorkoutActivityType.MIND_AND_BODY,
       HealthWorkoutActivityType.MIXED_CARDIO,
       HealthWorkoutActivityType.OTHER,
@@ -1699,6 +1767,7 @@ class Health {
     // Returns true if the type is part of the Android set
     return {
       // Both
+      HealthWorkoutActivityType.AEROBICS,
       HealthWorkoutActivityType.AMERICAN_FOOTBALL,
       HealthWorkoutActivityType.ARCHERY,
       HealthWorkoutActivityType.AUSTRALIAN_FOOTBALL,
@@ -1721,6 +1790,7 @@ class Health {
       HealthWorkoutActivityType.HIKING,
       HealthWorkoutActivityType.HOCKEY,
       HealthWorkoutActivityType.MARTIAL_ARTS,
+      HealthWorkoutActivityType.MIXED_MARTIAL_ARTS,
       HealthWorkoutActivityType.PILATES,
       HealthWorkoutActivityType.RACQUETBALL,
       HealthWorkoutActivityType.ROWING,

@@ -105,12 +105,28 @@ class AudiogramHealthValue extends HealthValue {
 /// * [workoutActivityType] - the type of workout
 /// * [totalEnergyBurned] - the total energy burned during the workout
 /// * [totalEnergyBurnedUnit] - the unit of the total energy burned
+/// * [energyBurnedValues] - individual Health Connect total-calorie records
+/// * [energyBurnedValuesUnit] - the unit of [energyBurnedValues]
 /// * [totalDistance] - the total distance of the workout
 /// * [totalDistanceUnit] - the unit of the total distance
+/// * [duration] - the workout duration in seconds
+/// * [activityName] - the provider supplied workout name, when available
+/// * [totalElevationAscended] - the total elevation ascended during the workout
+/// * [totalElevationDescended] - the total elevation descended during the workout
+/// * [averageSpeed] - the average speed during the workout
 @JsonSerializable(includeIfNull: false, explicitToJson: true)
 class WorkoutHealthValue extends HealthValue {
+  /// The workout duration in seconds.
+  double? duration;
+
+  /// The unit of [duration].
+  String? durationUnit;
+
   /// The type of the workout.
   HealthWorkoutActivityType workoutActivityType;
+
+  /// The provider supplied workout name, when available.
+  String? activityName;
 
   /// The total energy burned during the workout.
   /// Might not be available for all workouts.
@@ -119,6 +135,15 @@ class WorkoutHealthValue extends HealthValue {
   /// The unit of the total energy burned during the workout.
   /// Might not be available for all workouts.
   HealthDataUnit? totalEnergyBurnedUnit;
+
+  /// Individual TotalCaloriesBurnedRecord values associated with the workout.
+  ///
+  /// Journey historically emitted one measurement for every matching record instead
+  /// of calculating a local sum. This list preserves that provider-level behavior.
+  List<double> energyBurnedValues;
+
+  /// The unit shared by [energyBurnedValues].
+  HealthDataUnit? energyBurnedValuesUnit;
 
   /// The total distance covered during the workout.
   /// Might not be available for all workouts.
@@ -136,14 +161,43 @@ class WorkoutHealthValue extends HealthValue {
   /// Might not be available for all workouts.
   HealthDataUnit? totalStepsUnit;
 
+  /// The total elevation ascended during the workout.
+  double? totalElevationAscended;
+
+  /// The unit of [totalElevationAscended].
+  HealthDataUnit? totalElevationAscendedUnit;
+
+  /// The total elevation descended during the workout.
+  double? totalElevationDescended;
+
+  /// The unit of [totalElevationDescended].
+  HealthDataUnit? totalElevationDescendedUnit;
+
+  /// The average speed during the workout.
+  double? averageSpeed;
+
+  /// The unit of [averageSpeed].
+  HealthDataUnit? averageSpeedUnit;
+
   WorkoutHealthValue({
     required this.workoutActivityType,
+    this.duration,
+    this.durationUnit,
+    this.activityName,
     this.totalEnergyBurned,
     this.totalEnergyBurnedUnit,
+    this.energyBurnedValues = const [],
+    this.energyBurnedValuesUnit,
     this.totalDistance,
     this.totalDistanceUnit,
     this.totalSteps,
     this.totalStepsUnit,
+    this.totalElevationAscended,
+    this.totalElevationAscendedUnit,
+    this.totalElevationDescended,
+    this.totalElevationDescendedUnit,
+    this.averageSpeed,
+    this.averageSpeedUnit,
   });
 
   /// Create a [WorkoutHealthValue] based on a health data point from native data format.
@@ -152,9 +206,17 @@ class WorkoutHealthValue extends HealthValue {
       (element) => element.name == dataPoint['workoutActivityType'],
       orElse: () => HealthWorkoutActivityType.OTHER,
     ),
+    duration: (dataPoint['duration'] as num?)?.toDouble(),
+    durationUnit: (dataPoint['durationUnit'] as String?)?.toLowerCase(),
+    activityName: dataPoint['activityName'] as String?,
     totalEnergyBurned: dataPoint['totalEnergyBurned'] != null ? (dataPoint['totalEnergyBurned'] as num).toInt() : null,
     totalEnergyBurnedUnit: dataPoint['totalEnergyBurnedUnit'] != null
         ? HealthDataUnit.values.firstWhere((element) => element.name == dataPoint['totalEnergyBurnedUnit'])
+        : null,
+    energyBurnedValues:
+        (dataPoint['energyBurnedValues'] as List?)?.map((value) => (value as num).toDouble()).toList() ?? const [],
+    energyBurnedValuesUnit: dataPoint['energyBurnedValuesUnit'] != null
+        ? HealthDataUnit.values.firstWhere((element) => element.name == dataPoint['energyBurnedValuesUnit'])
         : null,
     totalDistance: dataPoint['totalDistance'] != null ? (dataPoint['totalDistance'] as num).toInt() : null,
     totalDistanceUnit: dataPoint['totalDistanceUnit'] != null
@@ -163,6 +225,18 @@ class WorkoutHealthValue extends HealthValue {
     totalSteps: dataPoint['totalSteps'] != null ? (dataPoint['totalSteps'] as num).toInt() : null,
     totalStepsUnit: dataPoint['totalStepsUnit'] != null
         ? HealthDataUnit.values.firstWhere((element) => element.name == dataPoint['totalStepsUnit'])
+        : null,
+    totalElevationAscended: (dataPoint['totalElevationAscended'] as num?)?.toDouble(),
+    totalElevationAscendedUnit: dataPoint['totalElevationAscendedUnit'] != null
+        ? HealthDataUnit.values.firstWhere((element) => element.name == dataPoint['totalElevationAscendedUnit'])
+        : null,
+    totalElevationDescended: (dataPoint['totalElevationDescended'] as num?)?.toDouble(),
+    totalElevationDescendedUnit: dataPoint['totalElevationDescendedUnit'] != null
+        ? HealthDataUnit.values.firstWhere((element) => element.name == dataPoint['totalElevationDescendedUnit'])
+        : null,
+    averageSpeed: (dataPoint['averageSpeed'] as num?)?.toDouble(),
+    averageSpeedUnit: dataPoint['averageSpeedUnit'] != null
+        ? HealthDataUnit.values.firstWhere((element) => element.name == dataPoint['averageSpeedUnit'])
         : null,
   );
 
@@ -176,33 +250,66 @@ class WorkoutHealthValue extends HealthValue {
   @override
   String toString() =>
       """$runtimeType - workoutActivityType: ${workoutActivityType.name},
+           duration: $duration,
+           durationUnit: $durationUnit,
+           activityName: $activityName,
            totalEnergyBurned: $totalEnergyBurned,
            totalEnergyBurnedUnit: ${totalEnergyBurnedUnit?.name},
+           energyBurnedValues: $energyBurnedValues,
+           energyBurnedValuesUnit: ${energyBurnedValuesUnit?.name},
            totalDistance: $totalDistance,
            totalDistanceUnit: ${totalDistanceUnit?.name}
            totalSteps: $totalSteps,
-           totalStepsUnit: ${totalStepsUnit?.name}""";
+           totalStepsUnit: ${totalStepsUnit?.name},
+           totalElevationAscended: $totalElevationAscended,
+           totalElevationAscendedUnit: ${totalElevationAscendedUnit?.name},
+           totalElevationDescended: $totalElevationDescended,
+           totalElevationDescendedUnit: ${totalElevationDescendedUnit?.name},
+           averageSpeed: $averageSpeed,
+           averageSpeedUnit: ${averageSpeedUnit?.name}""";
 
   @override
   bool operator ==(Object other) =>
       other is WorkoutHealthValue &&
       workoutActivityType == other.workoutActivityType &&
+      duration == other.duration &&
+      durationUnit == other.durationUnit &&
+      activityName == other.activityName &&
       totalEnergyBurned == other.totalEnergyBurned &&
       totalEnergyBurnedUnit == other.totalEnergyBurnedUnit &&
+      listEquals(energyBurnedValues, other.energyBurnedValues) &&
+      energyBurnedValuesUnit == other.energyBurnedValuesUnit &&
       totalDistance == other.totalDistance &&
       totalDistanceUnit == other.totalDistanceUnit &&
       totalSteps == other.totalSteps &&
-      totalStepsUnit == other.totalStepsUnit;
+      totalStepsUnit == other.totalStepsUnit &&
+      totalElevationAscended == other.totalElevationAscended &&
+      totalElevationAscendedUnit == other.totalElevationAscendedUnit &&
+      totalElevationDescended == other.totalElevationDescended &&
+      totalElevationDescendedUnit == other.totalElevationDescendedUnit &&
+      averageSpeed == other.averageSpeed &&
+      averageSpeedUnit == other.averageSpeedUnit;
 
   @override
   int get hashCode => Object.hash(
     workoutActivityType,
+    duration,
+    durationUnit,
+    activityName,
     totalEnergyBurned,
     totalEnergyBurnedUnit,
+    Object.hashAll(energyBurnedValues),
+    energyBurnedValuesUnit,
     totalDistance,
     totalDistanceUnit,
     totalSteps,
     totalStepsUnit,
+    totalElevationAscended,
+    totalElevationAscendedUnit,
+    totalElevationDescended,
+    totalElevationDescendedUnit,
+    averageSpeed,
+    averageSpeedUnit,
   );
 }
 
@@ -1016,8 +1123,7 @@ class SkinTemperatureHealthValue extends HealthValue {
     final baseline = (dataMap['baseline'] as num?)?.toDouble();
 
     final locationRaw = dataMap['measurement_location'];
-    SkinTemperatureMeasurementLocation location =
-        SkinTemperatureMeasurementLocation.unknown;
+    SkinTemperatureMeasurementLocation location = SkinTemperatureMeasurementLocation.unknown;
     if (locationRaw is int) {
       location = SkinTemperatureMeasurementLocation.fromAndroidValue(locationRaw);
     } else if (locationRaw is String) {
@@ -1027,11 +1133,7 @@ class SkinTemperatureHealthValue extends HealthValue {
       );
     }
 
-    return SkinTemperatureHealthValue(
-      temperatureDelta: delta,
-      baseline: baseline,
-      measurementLocation: location,
-    );
+    return SkinTemperatureHealthValue(temperatureDelta: delta, baseline: baseline, measurementLocation: location);
   }
 
   @override

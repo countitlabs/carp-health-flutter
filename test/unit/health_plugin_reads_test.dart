@@ -57,6 +57,7 @@ void main() {
       );
 
       expect(result, isNotNull);
+      expect(result!.sourceDeviceId, 'stub-ios-id');
       final call = ctx.channel.lastCallFor('getDataByUUID');
       expect(call, isNotNull);
       final args = Map<String, dynamic>.from(call!.arguments as Map);

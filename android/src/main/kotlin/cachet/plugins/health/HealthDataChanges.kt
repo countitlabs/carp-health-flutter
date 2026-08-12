@@ -7,7 +7,9 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.changes.DeletionChange
 import androidx.health.connect.client.changes.UpsertionChange
 import androidx.health.connect.client.records.*
+import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ChangesTokenRequest
+import androidx.health.connect.client.time.TimeRangeFilter
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel.Result
 import kotlinx.coroutines.CoroutineScope
@@ -178,17 +180,32 @@ class HealthDataChanges(
         is TotalCaloriesBurnedRecord -> listOf(HealthConstants.TOTAL_CALORIES_BURNED)
         is MenstruationFlowRecord -> listOf(HealthConstants.MENSTRUATION_FLOW)
         is SpeedRecord -> listOf(HealthConstants.SPEED)
+        is ElevationGainedRecord -> listOf(HealthConstants.ELEVATION_GAINED)
         is ActivityIntensityRecord -> listOf(HealthConstants.ACTIVITY_INTENSITY)
         else -> emptyList()
     }
 
-    private fun convertWorkoutRecord(record: ExerciseSessionRecord): Map<String, Any?> {
+    private suspend fun convertWorkoutRecord(record: ExerciseSessionRecord): Map<String, Any?> {
         val workoutType =
             HealthConstants.workoutTypeReverseMap[record.exerciseType] ?: "OTHER"
+        val durationResult = healthConnectClient.aggregate(
+            AggregateRequest(
+                metrics = setOf(ExerciseSessionRecord.EXERCISE_DURATION_TOTAL),
+                timeRangeFilter = TimeRangeFilter.between(record.startTime, record.endTime),
+                dataOriginFilter = setOf(record.metadata.dataOrigin),
+            ),
+        )
+        val durationSeconds =
+            durationResult[ExerciseSessionRecord.EXERCISE_DURATION_TOTAL]
+                ?.seconds
+                ?.toDouble()
 
         return mapOf(
             "uuid" to record.metadata.id,
+            "activityName" to record.exerciseType.toString(),
             "workoutActivityType" to workoutType,
+            "duration" to durationSeconds,
+            "durationUnit" to "second",
             "totalDistance" to null,
             "totalDistanceUnit" to null,
             "totalEnergyBurned" to null,
@@ -198,7 +215,7 @@ class HealthDataChanges(
             "unit" to "MINUTES",
             "date_from" to record.startTime.toEpochMilli(),
             "date_to" to record.endTime.toEpochMilli(),
-            "source_id" to "",
+            "source_id" to record.metadata.id,
             "source_name" to record.metadata.dataOrigin.packageName,
             "recording_method" to record.metadata.recordingMethod,
         )

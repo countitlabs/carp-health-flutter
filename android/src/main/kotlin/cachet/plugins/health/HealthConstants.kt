@@ -25,6 +25,7 @@ object HealthConstants {
     const val BODY_TEMPERATURE = "BODY_TEMPERATURE"
     const val BODY_WATER_MASS = "BODY_WATER_MASS"
     const val DISTANCE_DELTA = "DISTANCE_DELTA"
+    const val ELEVATION_GAINED = "ELEVATION_GAINED"
     const val FLIGHTS_CLIMBED = "FLIGHTS_CLIMBED"
     const val HEART_RATE = "HEART_RATE"
     const val HEART_RATE_VARIABILITY_RMSSD = "HEART_RATE_VARIABILITY_RMSSD"
@@ -87,6 +88,7 @@ object HealthConstants {
         BLOOD_GLUCOSE to BloodGlucoseRecord::class,
         HEART_RATE_VARIABILITY_RMSSD to HeartRateVariabilityRmssdRecord::class,
         DISTANCE_DELTA to DistanceRecord::class,
+        ELEVATION_GAINED to ElevationGainedRecord::class,
         WATER to HydrationRecord::class,
         SLEEP_ASLEEP to SleepSessionRecord::class,
         SLEEP_AWAKE to SleepSessionRecord::class,
@@ -124,6 +126,8 @@ object HealthConstants {
         ACTIVE_ENERGY_BURNED to ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL,
         HEART_RATE to HeartRateRecord.MEASUREMENTS_COUNT,
         DISTANCE_DELTA to DistanceRecord.DISTANCE_TOTAL,
+        ELEVATION_GAINED to ElevationGainedRecord.ELEVATION_GAINED_TOTAL,
+        SPEED to SpeedRecord.SPEED_AVG,
         WATER to HydrationRecord.VOLUME_TOTAL,
         SLEEP_ASLEEP to SleepSessionRecord.SLEEP_DURATION_TOTAL,
         SLEEP_AWAKE to SleepSessionRecord.SLEEP_DURATION_TOTAL,
@@ -191,6 +195,7 @@ object HealthConstants {
         "BASEBALL" to ExerciseSessionRecord.EXERCISE_TYPE_BASEBALL,
         "BASKETBALL" to ExerciseSessionRecord.EXERCISE_TYPE_BASKETBALL,
         "BIKING" to ExerciseSessionRecord.EXERCISE_TYPE_BIKING,
+        "BIKING_STATIONARY" to ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY,
         "BOXING" to ExerciseSessionRecord.EXERCISE_TYPE_BOXING,
         "CALISTHENICS" to ExerciseSessionRecord.EXERCISE_TYPE_CALISTHENICS,
         "CARDIO_DANCE" to ExerciseSessionRecord.EXERCISE_TYPE_DANCING,
@@ -199,6 +204,7 @@ object HealthConstants {
         "DANCING" to ExerciseSessionRecord.EXERCISE_TYPE_DANCING,
         "DOWNHILL_SKIING" to ExerciseSessionRecord.EXERCISE_TYPE_SKIING,
         "ELLIPTICAL" to ExerciseSessionRecord.EXERCISE_TYPE_ELLIPTICAL,
+        "AEROBICS" to ExerciseSessionRecord.EXERCISE_TYPE_EXERCISE_CLASS,
         "FENCING" to ExerciseSessionRecord.EXERCISE_TYPE_FENCING,
         "FRISBEE_DISC" to ExerciseSessionRecord.EXERCISE_TYPE_FRISBEE_DISC,
         "GOLF" to ExerciseSessionRecord.EXERCISE_TYPE_GOLF,
@@ -207,8 +213,12 @@ object HealthConstants {
         "HANDBALL" to ExerciseSessionRecord.EXERCISE_TYPE_HANDBALL,
         "HIGH_INTENSITY_INTERVAL_TRAINING" to ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING,
         "HIKING" to ExerciseSessionRecord.EXERCISE_TYPE_HIKING,
+        "HOCKEY" to ExerciseSessionRecord.EXERCISE_TYPE_ICE_HOCKEY,
         "ICE_SKATING" to ExerciseSessionRecord.EXERCISE_TYPE_ICE_SKATING,
         "MARTIAL_ARTS" to ExerciseSessionRecord.EXERCISE_TYPE_MARTIAL_ARTS,
+        // Journey historically exposes Health Connect martial arts as MIXED_MARTIAL_ARTS.
+        // Keep both names for write compatibility and normalize reads below.
+        "MIXED_MARTIAL_ARTS" to ExerciseSessionRecord.EXERCISE_TYPE_MARTIAL_ARTS,
         "PARAGLIDING" to ExerciseSessionRecord.EXERCISE_TYPE_PARAGLIDING,
         "PILATES" to ExerciseSessionRecord.EXERCISE_TYPE_PILATES,
         "RACQUETBALL" to ExerciseSessionRecord.EXERCISE_TYPE_RACQUETBALL,
@@ -224,6 +234,7 @@ object HealthConstants {
         "SKIING" to ExerciseSessionRecord.EXERCISE_TYPE_SKIING,
         "SNOWBOARDING" to ExerciseSessionRecord.EXERCISE_TYPE_SNOWBOARDING,
         "SNOWSHOEING" to ExerciseSessionRecord.EXERCISE_TYPE_SNOWSHOEING,
+        "SOCCER" to ExerciseSessionRecord.EXERCISE_TYPE_SOCCER,
         "SOCIAL_DANCE" to ExerciseSessionRecord.EXERCISE_TYPE_DANCING,
         "SOFTBALL" to ExerciseSessionRecord.EXERCISE_TYPE_SOFTBALL,
         "SQUASH" to ExerciseSessionRecord.EXERCISE_TYPE_SQUASH,
@@ -247,5 +258,13 @@ object HealthConstants {
     )
 
     val workoutTypeReverseMap: Map<Int, String> =
-        workoutTypeMap.entries.associate { (key, value) -> value to key }
+        workoutTypeMap.entries.associate { (key, value) -> value to key }.toMutableMap().apply {
+            // Preserve Journey's historical Health Connect normalization.
+            put(ExerciseSessionRecord.EXERCISE_TYPE_EXERCISE_CLASS, "AEROBICS")
+            put(ExerciseSessionRecord.EXERCISE_TYPE_MARTIAL_ARTS, "MIXED_MARTIAL_ARTS")
+            put(ExerciseSessionRecord.EXERCISE_TYPE_DANCING, "DANCING")
+            put(ExerciseSessionRecord.EXERCISE_TYPE_ICE_HOCKEY, "HOCKEY")
+            put(ExerciseSessionRecord.EXERCISE_TYPE_ROLLER_HOCKEY, "HOCKEY")
+            put(ExerciseSessionRecord.EXERCISE_TYPE_WHEELCHAIR, "WHEELCHAIR")
+        }
 }

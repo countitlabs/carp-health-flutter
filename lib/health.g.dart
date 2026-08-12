@@ -30,7 +30,7 @@ HealthDataPoint _$HealthDataPointFromJson(
       : WorkoutSummary.fromJson(json['workoutSummary'] as Map<String, dynamic>),
   metadata: json['metadata'] as Map<String, dynamic>?,
   deviceModel: json['deviceModel'] as String?,
-);
+)..deviceId = json['deviceId'] as String;
 
 Map<String, dynamic> _$HealthDataPointToJson(HealthDataPoint instance) =>
     <String, dynamic>{
@@ -42,6 +42,7 @@ Map<String, dynamic> _$HealthDataPointToJson(HealthDataPoint instance) =>
       'dateTo': instance.dateTo.toIso8601String(),
       'sourcePlatform': _$HealthPlatformTypeEnumMap[instance.sourcePlatform]!,
       'sourceDeviceId': instance.sourceDeviceId,
+      'deviceId': instance.deviceId,
       'sourceId': instance.sourceId,
       'sourceName': instance.sourceName,
       'recordingMethod': _$RecordingMethodEnumMap[instance.recordingMethod]!,
@@ -123,6 +124,7 @@ const _$HealthDataTypeEnumMap = {
   HealthDataType.DISTANCE_CYCLING: 'DISTANCE_CYCLING',
   HealthDataType.FLIGHTS_CLIMBED: 'FLIGHTS_CLIMBED',
   HealthDataType.DISTANCE_DELTA: 'DISTANCE_DELTA',
+  HealthDataType.ELEVATION_GAINED: 'ELEVATION_GAINED',
   HealthDataType.WALKING_SPEED: 'WALKING_SPEED',
   HealthDataType.SPEED: 'SPEED',
   HealthDataType.MINDFULNESS: 'MINDFULNESS',
@@ -221,6 +223,7 @@ const _$HealthDataUnitEnumMap = {
 
 const _$HealthPlatformTypeEnumMap = {
   HealthPlatformType.appleHealth: 'appleHealth',
+  HealthPlatformType.googleFit: 'googleFit',
   HealthPlatformType.googleHealthConnect: 'googleHealthConnect',
 };
 
@@ -276,10 +279,22 @@ WorkoutHealthValue _$WorkoutHealthValueFromJson(Map<String, dynamic> json) =>
         _$HealthWorkoutActivityTypeEnumMap,
         json['workoutActivityType'],
       ),
+      duration: (json['duration'] as num?)?.toDouble(),
+      durationUnit: json['durationUnit'] as String?,
+      activityName: json['activityName'] as String?,
       totalEnergyBurned: (json['totalEnergyBurned'] as num?)?.toInt(),
       totalEnergyBurnedUnit: $enumDecodeNullable(
         _$HealthDataUnitEnumMap,
         json['totalEnergyBurnedUnit'],
+      ),
+      energyBurnedValues:
+          (json['energyBurnedValues'] as List<dynamic>?)
+              ?.map((e) => (e as num).toDouble())
+              .toList() ??
+          const [],
+      energyBurnedValuesUnit: $enumDecodeNullable(
+        _$HealthDataUnitEnumMap,
+        json['energyBurnedValuesUnit'],
       ),
       totalDistance: (json['totalDistance'] as num?)?.toInt(),
       totalDistanceUnit: $enumDecodeNullable(
@@ -291,23 +306,55 @@ WorkoutHealthValue _$WorkoutHealthValueFromJson(Map<String, dynamic> json) =>
         _$HealthDataUnitEnumMap,
         json['totalStepsUnit'],
       ),
+      totalElevationAscended: (json['totalElevationAscended'] as num?)
+          ?.toDouble(),
+      totalElevationAscendedUnit: $enumDecodeNullable(
+        _$HealthDataUnitEnumMap,
+        json['totalElevationAscendedUnit'],
+      ),
+      totalElevationDescended: (json['totalElevationDescended'] as num?)
+          ?.toDouble(),
+      totalElevationDescendedUnit: $enumDecodeNullable(
+        _$HealthDataUnitEnumMap,
+        json['totalElevationDescendedUnit'],
+      ),
+      averageSpeed: (json['averageSpeed'] as num?)?.toDouble(),
+      averageSpeedUnit: $enumDecodeNullable(
+        _$HealthDataUnitEnumMap,
+        json['averageSpeedUnit'],
+      ),
     )..$type = json['__type'] as String?;
 
 Map<String, dynamic> _$WorkoutHealthValueToJson(WorkoutHealthValue instance) =>
     <String, dynamic>{
       '__type': ?instance.$type,
+      'duration': ?instance.duration,
+      'durationUnit': ?instance.durationUnit,
       'workoutActivityType':
           _$HealthWorkoutActivityTypeEnumMap[instance.workoutActivityType]!,
+      'activityName': ?instance.activityName,
       'totalEnergyBurned': ?instance.totalEnergyBurned,
       'totalEnergyBurnedUnit':
           ?_$HealthDataUnitEnumMap[instance.totalEnergyBurnedUnit],
+      'energyBurnedValues': instance.energyBurnedValues,
+      'energyBurnedValuesUnit':
+          ?_$HealthDataUnitEnumMap[instance.energyBurnedValuesUnit],
       'totalDistance': ?instance.totalDistance,
       'totalDistanceUnit': ?_$HealthDataUnitEnumMap[instance.totalDistanceUnit],
       'totalSteps': ?instance.totalSteps,
       'totalStepsUnit': ?_$HealthDataUnitEnumMap[instance.totalStepsUnit],
+      'totalElevationAscended': ?instance.totalElevationAscended,
+      'totalElevationAscendedUnit':
+          ?_$HealthDataUnitEnumMap[instance.totalElevationAscendedUnit],
+      'totalElevationDescended': ?instance.totalElevationDescended,
+      'totalElevationDescendedUnit':
+          ?_$HealthDataUnitEnumMap[instance.totalElevationDescendedUnit],
+      'averageSpeed': ?instance.averageSpeed,
+      'averageSpeedUnit': ?_$HealthDataUnitEnumMap[instance.averageSpeedUnit],
     };
 
 const _$HealthWorkoutActivityTypeEnumMap = {
+  HealthWorkoutActivityType.AEROBICS: 'AEROBICS',
   HealthWorkoutActivityType.AMERICAN_FOOTBALL: 'AMERICAN_FOOTBALL',
   HealthWorkoutActivityType.ARCHERY: 'ARCHERY',
   HealthWorkoutActivityType.AUSTRALIAN_FOOTBALL: 'AUSTRALIAN_FOOTBALL',
@@ -333,6 +380,7 @@ const _$HealthWorkoutActivityTypeEnumMap = {
   HealthWorkoutActivityType.JUMP_ROPE: 'JUMP_ROPE',
   HealthWorkoutActivityType.KICKBOXING: 'KICKBOXING',
   HealthWorkoutActivityType.MARTIAL_ARTS: 'MARTIAL_ARTS',
+  HealthWorkoutActivityType.MIXED_MARTIAL_ARTS: 'MIXED_MARTIAL_ARTS',
   HealthWorkoutActivityType.PILATES: 'PILATES',
   HealthWorkoutActivityType.RACQUETBALL: 'RACQUETBALL',
   HealthWorkoutActivityType.ROWING: 'ROWING',

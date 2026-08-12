@@ -29,8 +29,8 @@ class HealthFixtures {
   static Map<String, dynamic> workoutPoint({
     String uuid = 'workout-uuid-1',
     String activityType = 'RUNNING',
-    int totalEnergyBurned = 200,
-    String totalEnergyBurnedUnit = 'KILOCALORIE',
+    int? totalEnergyBurned = 200,
+    String? totalEnergyBurnedUnit = 'KILOCALORIE',
     int totalDistance = 5000,
     String totalDistanceUnit = 'METER',
     DateTime? from,
@@ -38,6 +38,13 @@ class HealthFixtures {
     String sourceId = 'source-id',
     String sourceName = 'source-name',
     int recordingMethod = 2,
+    double duration = 3600,
+    String durationUnit = 'SECOND',
+    String activityName = 'Morning run',
+    double totalElevationAscended = 120,
+    double totalElevationDescended = 95,
+    double averageSpeed = 2.5,
+    List<double> energyBurnedValues = const [],
     Map<String, dynamic>? metadata,
   }) {
     return {
@@ -47,6 +54,17 @@ class HealthFixtures {
       'totalEnergyBurnedUnit': totalEnergyBurnedUnit,
       'totalDistance': totalDistance,
       'totalDistanceUnit': totalDistanceUnit,
+      'duration': duration,
+      'durationUnit': durationUnit,
+      'activityName': activityName,
+      'totalElevationAscended': totalElevationAscended,
+      'totalElevationAscendedUnit': 'METER',
+      'totalElevationDescended': totalElevationDescended,
+      'totalElevationDescendedUnit': 'METER',
+      'averageSpeed': averageSpeed,
+      'averageSpeedUnit': 'METER_PER_SECOND',
+      'energyBurnedValues': energyBurnedValues,
+      if (energyBurnedValues.isNotEmpty) 'energyBurnedValuesUnit': 'KILOCALORIE',
       'date_from': (from ?? start).millisecondsSinceEpoch,
       'date_to': (to ?? end).millisecondsSinceEpoch,
       'source_id': sourceId,
@@ -94,15 +112,8 @@ class HealthFixtures {
   }) {
     return {
       'changes': [
-        {
-          'type': 'upsert',
-          'dataTypeKey': HealthDataType.HEART_RATE.name,
-          'dataPoint': numericPoint(),
-        },
-        {
-          'type': 'delete',
-          'recordId': 'deleted-record-1',
-        },
+        {'type': 'upsert', 'dataTypeKey': HealthDataType.HEART_RATE.name, 'dataPoint': numericPoint()},
+        {'type': 'delete', 'recordId': 'deleted-record-1'},
       ],
       'nextChangesToken': nextToken,
       'hasMore': hasMore,

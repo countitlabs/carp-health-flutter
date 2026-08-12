@@ -34,6 +34,63 @@ class HealthDataReader {
         self.characteristicsTypesDict = characteristicsTypesDict
     }
 
+    private func workoutDictionary(_ sample: HKWorkout) -> NSDictionary {
+        let activityType = workoutActivityTypeMap.first(where: {
+            $0.value == sample.workoutActivityType
+        })?.key ?? "OTHER"
+        let activityName = String(describing: sample.workoutActivityType)
+
+        var dictionary: [String: Any] = [
+            "uuid": "\(sample.uuid)",
+            "workoutActivityType": activityType,
+            "activityName": activityName,
+            "duration": sample.duration,
+            "durationUnit": "SECOND",
+            "date_from": Int(sample.startDate.timeIntervalSince1970 * 1000),
+            "date_to": Int(sample.endDate.timeIntervalSince1970 * 1000),
+            "source_id": sample.sourceRevision.source.bundleIdentifier,
+            "source_name": sample.sourceRevision.source.name,
+            "recording_method":
+                (sample.metadata?[HKMetadataKeyWasUserEntered] as? Bool == true)
+                ? HealthConstants.RecordingMethod.manual.rawValue
+                : HealthConstants.RecordingMethod.automatic.rawValue,
+            "workout_type": HKWorkoutActivityType.toString(sample.workoutActivityType),
+            "total_distance": sample.totalDistance != nil
+                ? Int(sample.totalDistance!.doubleValue(for: HKUnit.meter())) : 0,
+            "total_energy_burned": sample.totalEnergyBurned != nil
+                ? Int(sample.totalEnergyBurned!.doubleValue(for: HKUnit.kilocalorie())) : 0,
+        ]
+
+        if let energy = sample.totalEnergyBurned?.doubleValue(for: HKUnit.kilocalorie()) {
+            dictionary["totalEnergyBurned"] = energy
+            dictionary["totalEnergyBurnedUnit"] = "KILOCALORIE"
+        }
+        if let distance = sample.totalDistance?.doubleValue(for: HKUnit.meter()) {
+            dictionary["totalDistance"] = distance
+            dictionary["totalDistanceUnit"] = "METER"
+        }
+        if let elevation = (sample.metadata?[HKMetadataKeyElevationAscended] as? HKQuantity)?
+            .doubleValue(for: HKUnit.meter())
+        {
+            dictionary["totalElevationAscended"] = elevation
+            dictionary["totalElevationAscendedUnit"] = "METER"
+        }
+        if let elevation = (sample.metadata?[HKMetadataKeyElevationDescended] as? HKQuantity)?
+            .doubleValue(for: HKUnit.meter())
+        {
+            dictionary["totalElevationDescended"] = elevation
+            dictionary["totalElevationDescendedUnit"] = "METER"
+        }
+        if let speed = (sample.metadata?[HKMetadataKeyAverageSpeed] as? HKQuantity)?
+            .doubleValue(for: HKUnit.meter().unitDivided(by: HKUnit.second()))
+        {
+            dictionary["averageSpeed"] = speed
+            dictionary["averageSpeedUnit"] = "METER_PER_SECOND"
+        }
+
+        return dictionary as NSDictionary
+    }
+
     /// Gets health data
     /// - Parameters:
     ///   - call: Flutter method call
@@ -152,13 +209,11 @@ class HealthDataReader {
         ) { _, samplesOrNil, error in
             guard error == nil else {
                 DispatchQueue.main.async {
-                    result(
-                        FlutterError(
-                            code: "HEALTH_ERROR",
-                            message: "Error getting health data: \(error!.localizedDescription)",
-                            details: nil
-                        )
-                    )
+                    result(HealthUtilities.flutterError(
+                        error,
+                        fallbackCode: "HEALTH_ERROR",
+                        message: "Error getting health data"
+                    ))
                 }
                 return
             }
@@ -249,34 +304,7 @@ class HealthDataReader {
                     result(categories)
                 }
             } else if let workoutSamples = samples as? [HKWorkout] {
-                let dictionaries = workoutSamples.map { sample -> NSDictionary in
-                    return [
-                        "uuid": "\(sample.uuid)",
-                        "workoutActivityType": self.workoutActivityTypeMap.first(where: {
-                            $0.value == sample.workoutActivityType
-                        })?.key,
-                        "totalEnergyBurned": sample.totalEnergyBurned?.doubleValue(
-                            for: HKUnit.kilocalorie()
-                        ),
-                        "totalEnergyBurnedUnit": "KILOCALORIE",
-                        "totalDistance": sample.totalDistance?.doubleValue(for: HKUnit.meter()),
-                        "totalDistanceUnit": "METER",
-                        "date_from": Int(sample.startDate.timeIntervalSince1970 * 1000),
-                        "date_to": Int(sample.endDate.timeIntervalSince1970 * 1000),
-                        "source_id": sample.sourceRevision.source.bundleIdentifier,
-                        "source_name": sample.sourceRevision.source.name,
-                        "recording_method":
-                            (sample.metadata?[HKMetadataKeyWasUserEntered] as? Bool == true)
-                            ? HealthConstants.RecordingMethod.manual.rawValue
-                            : HealthConstants.RecordingMethod.automatic.rawValue,
-                        "workout_type": HKWorkoutActivityType.toString(sample.workoutActivityType),
-                        "total_distance": sample.totalDistance != nil
-                            ? Int(sample.totalDistance!.doubleValue(for: HKUnit.meter())) : 0,
-                        "total_energy_burned": sample.totalEnergyBurned != nil
-                            ? Int(sample.totalEnergyBurned!.doubleValue(for: HKUnit.kilocalorie()))
-                            : 0,
-                    ]
-                }
+                let dictionaries = workoutSamples.map(self.workoutDictionary)
 
                 DispatchQueue.main.async {
                     result(dictionaries)
@@ -433,14 +461,11 @@ class HealthDataReader {
             _, samplesOrNil, error in
             guard error == nil else {
                 DispatchQueue.main.async {
-                    result(
-                        FlutterError(
-                            code: "HEALTH_ERROR",
-                            message:
-                            "Error getting health data by UUID: \(error!.localizedDescription)",
-                            details: nil
-                        )
-                    )
+                    result(HealthUtilities.flutterError(
+                        error,
+                        fallbackCode: "HEALTH_ERROR",
+                        message: "Error getting health data by UUID"
+                    ))
                 }
                 return
             }
@@ -538,34 +563,7 @@ class HealthDataReader {
                     result(categories.first)
                 }
             } else if let workoutSamples = samples as? [HKWorkout] {
-                let dictionaries = workoutSamples.map { sample -> NSDictionary in
-                    return [
-                        "uuid": "\(sample.uuid)",
-                        "workoutActivityType": self.workoutActivityTypeMap.first(where: {
-                            $0.value == sample.workoutActivityType
-                        })?.key,
-                        "totalEnergyBurned": sample.totalEnergyBurned?.doubleValue(
-                            for: HKUnit.kilocalorie()
-                        ),
-                        "totalEnergyBurnedUnit": "KILOCALORIE",
-                        "totalDistance": sample.totalDistance?.doubleValue(for: HKUnit.meter()),
-                        "totalDistanceUnit": "METER",
-                        "date_from": Int(sample.startDate.timeIntervalSince1970 * 1000),
-                        "date_to": Int(sample.endDate.timeIntervalSince1970 * 1000),
-                        "source_id": sample.sourceRevision.source.bundleIdentifier,
-                        "source_name": sample.sourceRevision.source.name,
-                        "recording_method":
-                            (sample.metadata?[HKMetadataKeyWasUserEntered] as? Bool == true)
-                            ? HealthConstants.RecordingMethod.manual.rawValue
-                            : HealthConstants.RecordingMethod.automatic.rawValue,
-                        "workout_type": HKWorkoutActivityType.toString(sample.workoutActivityType),
-                        "total_distance": sample.totalDistance != nil
-                            ? Int(sample.totalDistance!.doubleValue(for: HKUnit.meter())) : 0,
-                        "total_energy_burned": sample.totalEnergyBurned != nil
-                            ? Int(sample.totalEnergyBurned!.doubleValue(for: HKUnit.kilocalorie()))
-                            : 0,
-                    ]
-                }
+                let dictionaries = workoutSamples.map(self.workoutDictionary)
 
                 DispatchQueue.main.async {
                     result(dictionaries.first)
@@ -742,13 +740,11 @@ class HealthDataReader {
 
             if let error {
                 DispatchQueue.main.async {
-                    result(
-                        FlutterError(
-                            code: "STATISTICS_ERROR",
-                            message: "Error getting statistics: \(error.localizedDescription)",
-                            details: nil
-                        )
-                    )
+                    result(HealthUtilities.flutterError(
+                        error,
+                        fallbackCode: "STATISTICS_ERROR",
+                        message: "Error getting statistics"
+                    ))
                 }
                 return
             }
@@ -855,15 +851,12 @@ class HealthDataReader {
         )
         query.initialResultsHandler = { _, results, error in
             guard let results else {
-                let errorMessage = error?.localizedDescription ?? "Unknown error"
                 DispatchQueue.main.async {
-                    result(
-                        FlutterError(
-                            code: "STEPS_ERROR",
-                            message: "Error getting step count: \(errorMessage)",
-                            details: nil
-                        )
-                    )
+                    result(HealthUtilities.flutterError(
+                        error,
+                        fallbackCode: "STEPS_ERROR",
+                        message: "Error getting step count"
+                    ))
                 }
                 return
             }
@@ -882,6 +875,128 @@ class HealthDataReader {
         }
 
         healthStore.execute(query)
+    }
+
+    func getTotalDistanceInterval(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        let arguments = call.arguments as? NSDictionary
+        let startTime = (arguments?["startTime"] as? NSNumber) ?? 0
+        let endTime = (arguments?["endTime"] as? NSNumber) ?? 0
+        let dateFrom = Date(timeIntervalSince1970: startTime.doubleValue / 1000)
+        let dateTo = Date(timeIntervalSince1970: endTime.doubleValue / 1000)
+        let type = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)!
+        let predicate = HKQuery.predicateForSamples(
+            withStart: dateFrom,
+            end: dateTo,
+            options: .strictStartDate
+        )
+
+        let query = HKStatisticsQuery(
+            quantityType: type,
+            quantitySamplePredicate: predicate,
+            options: .cumulativeSum
+        ) { _, statistics, error in
+            guard let statistics else {
+                DispatchQueue.main.async {
+                    result(HealthUtilities.flutterError(
+                        error,
+                        fallbackCode: "DISTANCE_ERROR",
+                        message: "Error getting total distance"
+                    ))
+                }
+                return
+            }
+
+            let distance = statistics.sumQuantity()?.doubleValue(for: .meter()) ?? 0
+            DispatchQueue.main.async {
+                result(distance)
+            }
+        }
+
+        healthStore.execute(query)
+    }
+
+    func getWorkoutRoute(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let arguments = call.arguments as? NSDictionary,
+              let workoutUUIDString = arguments["workoutUUID"] as? String,
+              let workoutUUID = UUID(uuidString: workoutUUIDString)
+        else {
+            result(FlutterError(
+                code: "INVALID_ARGUMENTS",
+                message: "workoutUUID is required and must be a valid UUID",
+                details: nil
+            ))
+            return
+        }
+
+        let workoutQuery = HKSampleQuery(
+            sampleType: HKSampleType.workoutType(),
+            predicate: HKQuery.predicateForObject(with: workoutUUID),
+            limit: 1,
+            sortDescriptors: nil
+        ) { [weak self] _, samples, error in
+            guard let self else { return }
+            guard error == nil else {
+                DispatchQueue.main.async {
+                    result(HealthUtilities.flutterError(
+                        error,
+                        fallbackCode: "ROUTE_ERROR",
+                        message: "Error looking up workout"
+                    ))
+                }
+                return
+            }
+            guard let workout = (samples as? [HKWorkout])?.first else {
+                DispatchQueue.main.async { result(nil) }
+                return
+            }
+
+            let routeQuery = HKSampleQuery(
+                sampleType: HKSeriesType.workoutRoute(),
+                predicate: HKQuery.predicateForObjects(from: workout),
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: nil
+            ) { _, routeSamples, routeError in
+                guard routeError == nil else {
+                    DispatchQueue.main.async {
+                        result(HealthUtilities.flutterError(
+                            routeError,
+                            fallbackCode: "ROUTE_ERROR",
+                            message: "Error looking up workout route"
+                        ))
+                    }
+                    return
+                }
+                guard let routeSamples, !routeSamples.isEmpty else {
+                    DispatchQueue.main.async { result(nil) }
+                    return
+                }
+
+                self.processWorkoutRouteSamples(
+                    samples: routeSamples,
+                    includeManualEntry: true
+                ) { value in
+                    guard let routes = value as? [[String: Any]] else {
+                        result(value)
+                        return
+                    }
+                    var points = routes.flatMap { $0["route"] as? [[String: Any]] ?? [] }
+                    points.sort {
+                        ($0["timestamp"] as? Int ?? 0) < ($1["timestamp"] as? Int ?? 0)
+                    }
+                    result([
+                        "uuid": "\(workout.uuid)",
+                        "workout_uuid": workoutUUIDString,
+                        "route": points,
+                        "date_from": Int(workout.startDate.timeIntervalSince1970 * 1000),
+                        "date_to": Int(workout.endDate.timeIntervalSince1970 * 1000),
+                        "source_id": workout.sourceRevision.source.bundleIdentifier,
+                        "source_name": workout.sourceRevision.source.name,
+                    ] as NSDictionary)
+                }
+            }
+            self.healthStore.execute(routeQuery)
+        }
+        healthStore.execute(workoutQuery)
     }
 
     private func processWorkoutRouteSamples(

@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.aggregate.AggregateMetric
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
 import androidx.health.connect.client.records.ExerciseRouteResult.ConsentRequired
@@ -33,6 +34,12 @@ class HealthDataReader(
     private val dataConverter: HealthDataConverter
 ) {
     private val recordingFilter = HealthRecordingFilter()
+
+    private data class WorkoutOptionalAggregates(
+        val totalSteps: Double? = null,
+        val elevationAscended: Double? = null,
+        val averageSpeed: Double? = null,
+    )
 
     /**
      * Retrieves all health data points of a specified type within a given time range.
@@ -424,6 +431,8 @@ class HealthDataReader(
                             totalValue = totalValue.inMeters
                         } else if (totalValue is Energy) {
                             totalValue = totalValue.inKilocalories
+                        } else if (totalValue is Velocity) {
+                            totalValue = totalValue.inMetersPerSecond
                         } else if (totalValue is TemperatureDelta) {
                             totalValue = totalValue.inCelsius
                         }
@@ -592,77 +601,208 @@ class HealthDataReader(
             )
         }
 
+        val grantedPermissions = try {
+            healthConnectClient.permissionController.getGrantedPermissions()
+        } catch (e: Exception) {
+            Log.w("FLUTTER_HEALTH", "Unable to resolve optional workout permissions", e)
+            emptySet()
+        }
+        val canReadSteps = grantedPermissions.contains(
+            HealthPermission.getReadPermission(StepsRecord::class),
+        )
+        val canReadElevation = grantedPermissions.contains(
+            HealthPermission.getReadPermission(ElevationGainedRecord::class),
+        )
+        val canReadSpeed = grantedPermissions.contains(
+            HealthPermission.getReadPermission(SpeedRecord::class),
+        )
+
         for (rec in filteredRecords) {
             val record = rec as ExerciseSessionRecord
             
-            // Get distance data
-            val distanceRequest = healthConnectClient.readRecords(
-                ReadRecordsRequest(
-                    recordType = DistanceRecord::class,
+            // The previous Journey Health Connect flow deliberately did not attach distance
+            // records to workouts. Distance continues to be read as its own data type instead of
+            // being inferred as a workout measurement.
+
+            // The previous flutter_health_connect flow exposed every matching
+            // TotalCaloriesBurnedRecord. Do not replace them with upstream health's local sum.
+            val energyBurnedValues = try {
+                readTotalCaloriesBurnedValues(record.startTime, record.endTime)
+            } catch (e: Exception) {
+                Log.w("FLUTTER_HEALTH", "Unable to read optional workout calories", e)
+                emptyList()
+            }
+
+            // Keep the workout metrics aligned with the previous Health Connect integration.
+            // In particular, exercise duration is not equivalent to endTime - startTime when a
+            // workout contains pauses.
+            val durationResult = healthConnectClient.aggregate(
+                AggregateRequest(
+                    metrics = setOf(ExerciseSessionRecord.EXERCISE_DURATION_TOTAL),
                     timeRangeFilter = TimeRangeFilter.between(
                         record.startTime,
                         record.endTime,
                     ),
+                    dataOriginFilter = setOf(record.metadata.dataOrigin),
                 ),
             )
-            var totalDistance = 0.0
-            for (distanceRec in distanceRequest.records) {
-                totalDistance += distanceRec.distance.inMeters
-            }
+            val durationSeconds =
+                durationResult[ExerciseSessionRecord.EXERCISE_DURATION_TOTAL]
+                    ?.seconds
+                    ?.toDouble()
 
-            // Get energy burned data
-            val energyBurnedRequest = healthConnectClient.readRecords(
-                ReadRecordsRequest(
-                    recordType = TotalCaloriesBurnedRecord::class,
-                    timeRangeFilter = TimeRangeFilter.between(
-                        record.startTime,
-                        record.endTime,
-                    ),
-                ),
+            // Steps, elevation, and speed historically shared an unfiltered workout interval, so
+            // they can safely use one request. Duration remains separate because it must retain
+            // the exercise record's data-origin filter to account for paused sessions correctly.
+            val optionalAggregates = readWorkoutOptionalAggregates(
+                record.startTime,
+                record.endTime,
+                canReadSteps,
+                canReadElevation,
+                canReadSpeed,
             )
-            var totalEnergyBurned = 0.0
-            for (energyBurnedRec in energyBurnedRequest.records) {
-                totalEnergyBurned += energyBurnedRec.energy.inKilocalories
-            }
-
-            // Get steps data
-            val stepRequest = healthConnectClient.readRecords(
-                ReadRecordsRequest(
-                    recordType = StepsRecord::class,
-                    timeRangeFilter = TimeRangeFilter.between(
-                        record.startTime,
-                        record.endTime
-                    ),
-                ),
-            )
-            var totalSteps = 0.0
-            for (stepRec in stepRequest.records) {
-                totalSteps += stepRec.count
-            }
 
             // Add final datapoint
             healthConnectData.add(
                 mapOf<String, Any?>(
                     "uuid" to record.metadata.id,
+                    "activityName" to record.exerciseType.toString(),
                     "workoutActivityType" to
-                            (HealthConstants.workoutTypeMap
-                                .filterValues { it == record.exerciseType }
-                                .keys
-                                .firstOrNull() ?: "OTHER"),
-                    "totalDistance" to if (totalDistance == 0.0) null else totalDistance,
-                    "totalDistanceUnit" to "METER",
-                    "totalEnergyBurned" to if (totalEnergyBurned == 0.0) null else totalEnergyBurned,
-                    "totalEnergyBurnedUnit" to "KILOCALORIE",
-                    "totalSteps" to if (totalSteps == 0.0) null else totalSteps,
-                    "totalStepsUnit" to "COUNT",
+                            (HealthConstants.workoutTypeReverseMap[record.exerciseType] ?: "OTHER"),
+                    "totalDistance" to null,
+                    "totalDistanceUnit" to null,
+                    "totalEnergyBurned" to null,
+                    "totalEnergyBurnedUnit" to null,
+                    "energyBurnedValues" to energyBurnedValues,
+                    "energyBurnedValuesUnit" to if (energyBurnedValues.isNotEmpty()) "KILOCALORIE" else null,
+                    "totalSteps" to optionalAggregates.totalSteps,
+                    "totalStepsUnit" to if (optionalAggregates.totalSteps != null) "COUNT" else null,
+                    "duration" to durationSeconds,
+                    "durationUnit" to "second",
+                    "totalElevationAscended" to optionalAggregates.elevationAscended,
+                    "totalElevationAscendedUnit" to if (optionalAggregates.elevationAscended != null) "METER" else null,
+                    "totalElevationDescended" to null,
+                    "totalElevationDescendedUnit" to null,
+                    "averageSpeed" to optionalAggregates.averageSpeed,
+                    "averageSpeedUnit" to if (optionalAggregates.averageSpeed != null) "METER_PER_SECOND" else null,
                     "unit" to "MINUTES",
                     "date_from" to record.startTime.toEpochMilli(),
                     "date_to" to record.endTime.toEpochMilli(),
-                    "source_id" to "",
+                    "source_id" to record.metadata.id,
                     "source_name" to record.metadata.dataOrigin.packageName,
+                    "recording_method" to record.metadata.recordingMethod,
                 ),
             )
         }
+    }
+
+    private suspend fun readWorkoutOptionalAggregates(
+        startTime: Instant,
+        endTime: Instant,
+        canReadSteps: Boolean,
+        canReadElevation: Boolean,
+        canReadSpeed: Boolean,
+    ): WorkoutOptionalAggregates {
+        val metrics = mutableSetOf<AggregateMetric<*>>()
+        if (canReadSteps) metrics.add(StepsRecord.COUNT_TOTAL)
+        if (canReadElevation) metrics.add(ElevationGainedRecord.ELEVATION_GAINED_TOTAL)
+        if (canReadSpeed) metrics.add(SpeedRecord.SPEED_AVG)
+
+        if (metrics.isEmpty()) return WorkoutOptionalAggregates()
+
+        val timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
+
+        try {
+            val result = healthConnectClient.aggregate(
+                AggregateRequest(
+                    metrics = metrics,
+                    timeRangeFilter = timeRangeFilter,
+                ),
+            )
+            return WorkoutOptionalAggregates(
+                totalSteps = result[StepsRecord.COUNT_TOTAL]?.toDouble()?.takeIf { it != 0.0 },
+                elevationAscended = result[ElevationGainedRecord.ELEVATION_GAINED_TOTAL]?.inMeters,
+                averageSpeed = result[SpeedRecord.SPEED_AVG]?.inMetersPerSecond,
+            )
+        } catch (e: Exception) {
+            Log.w(
+                "FLUTTER_HEALTH",
+                "Unable to aggregate optional workout metrics together; retrying separately",
+                e,
+            )
+        }
+
+        val totalSteps = if (canReadSteps) {
+            try {
+                healthConnectClient.aggregate(
+                    AggregateRequest(
+                        metrics = setOf(StepsRecord.COUNT_TOTAL),
+                        timeRangeFilter = timeRangeFilter,
+                    ),
+                )[StepsRecord.COUNT_TOTAL]?.toDouble()?.takeIf { it != 0.0 }
+            } catch (e: Exception) {
+                Log.w("FLUTTER_HEALTH", "Unable to aggregate optional workout steps", e)
+                null
+            }
+        } else {
+            null
+        }
+
+        val elevationAscended = if (canReadElevation) {
+            try {
+                healthConnectClient.aggregate(
+                    AggregateRequest(
+                        metrics = setOf(ElevationGainedRecord.ELEVATION_GAINED_TOTAL),
+                        timeRangeFilter = timeRangeFilter,
+                    ),
+                )[ElevationGainedRecord.ELEVATION_GAINED_TOTAL]?.inMeters
+            } catch (e: Exception) {
+                Log.w("FLUTTER_HEALTH", "Unable to aggregate optional workout elevation", e)
+                null
+            }
+        } else {
+            null
+        }
+
+        val averageSpeed = if (canReadSpeed) {
+            try {
+                healthConnectClient.aggregate(
+                    AggregateRequest(
+                        metrics = setOf(SpeedRecord.SPEED_AVG),
+                        timeRangeFilter = timeRangeFilter,
+                    ),
+                )[SpeedRecord.SPEED_AVG]?.inMetersPerSecond
+            } catch (e: Exception) {
+                Log.w("FLUTTER_HEALTH", "Unable to aggregate optional workout speed", e)
+                null
+            }
+        } else {
+            null
+        }
+
+        return WorkoutOptionalAggregates(totalSteps, elevationAscended, averageSpeed)
+    }
+
+    private suspend fun readTotalCaloriesBurnedValues(
+        startTime: Instant,
+        endTime: Instant,
+    ): List<Double> {
+        val values = mutableListOf<Double>()
+        var pageToken: String? = null
+
+        do {
+            val response = healthConnectClient.readRecords(
+                ReadRecordsRequest(
+                    recordType = TotalCaloriesBurnedRecord::class,
+                    timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+                    pageToken = pageToken,
+                ),
+            )
+            values.addAll(response.records.map { it.energy.inKilocalories })
+            pageToken = response.pageToken
+        } while (!pageToken.isNullOrEmpty())
+
+        return values
     }
 
     /**

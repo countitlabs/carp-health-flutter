@@ -11,6 +11,9 @@ import androidx.annotation.NonNull
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
+// GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ------------------------------------
+import cachet.plugins.health.googlefit.GoogleFitPlugin
+// GOOGLE FIT TEMPORARY SUPPORT - REMOVE END --------------------------------------
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -28,6 +31,10 @@ import kotlinx.coroutines.*
  */
 class HealthPlugin(private var channel: MethodChannel? = null) :
         MethodCallHandler, ActivityResultListener, Result, ActivityAware, FlutterPlugin {
+
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START --------------------------------
+    private val googleFitPlugin = GoogleFitPlugin()
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ----------------------------------
 
     private var mResult: Result? = null
     private var handler: Handler? = null
@@ -65,6 +72,9 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, CHANNEL_NAME)
         channel?.setMethodCallHandler(this)
+        // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ----------------------------
+        googleFitPlugin.onAttachedToEngine(flutterPluginBinding)
+        // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ------------------------------
         context = flutterPluginBinding.applicationContext
         handler = Handler(context!!.mainLooper)
 
@@ -83,6 +93,9 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
      * @param binding Plugin binding (unused in cleanup)
      */
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ----------------------------
+        googleFitPlugin.onDetachedFromEngine(binding)
+        // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ------------------------------
         channel = null
         activity = null
         scope.cancel()
@@ -195,6 +208,9 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
             return
         }
         binding.addActivityResultListener(this)
+        // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ----------------------------
+        googleFitPlugin.onAttachedToActivity(binding)
+        // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ------------------------------
         activity = binding.activity
 
         val requestPermissionActivityContract =
@@ -224,6 +240,9 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
         }
         activity = null
         healthConnectRequestPermissionsLauncher = null
+        // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ----------------------------
+        googleFitPlugin.onDetachedFromActivity()
+        // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ------------------------------
     }
 
     /**

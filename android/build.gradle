@@ -58,4 +58,10 @@ dependencies {
     implementation("androidx.health.connect:connect-client:1.2.0-alpha02")
     implementation "androidx.fragment:fragment-ktx:1.8.9"
 
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START --------------------------------
+    // Remove both dependencies together when Google Fit support is deleted.
+    implementation "com.google.android.gms:play-services-fitness:21.1.0"
+    implementation "com.google.android.gms:play-services-auth:20.2.0"
+    // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ----------------------------------
+
 }

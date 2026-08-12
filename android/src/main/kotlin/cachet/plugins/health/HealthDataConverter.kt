@@ -116,6 +116,15 @@ class HealthDataConverter {
             is SpeedRecord -> record.samples.map { sample ->
                 createInstantRecord(metadata, sample.time, sample.speed.inMetersPerSecond)
             }
+
+            is ElevationGainedRecord -> listOf(
+                createIntervalRecord(
+                    metadata,
+                    record.startTime,
+                    record.endTime,
+                    record.elevation.inMeters,
+                )
+            )
             
             is SleepSessionRecord -> listOf(
                 createIntervalRecord(
@@ -185,7 +194,8 @@ class HealthDataConverter {
      */
     private fun createBaseRecord(metadata: Metadata): MutableMap<String, Any?> = mutableMapOf(
         "uuid" to metadata.id,
-        "source_id" to "",
+        // Journey historically used the Health Connect record metadata id as its source id.
+        "source_id" to metadata.id,
         "source_name" to metadata.dataOrigin.packageName,
         "recording_method" to metadata.recordingMethod
     )

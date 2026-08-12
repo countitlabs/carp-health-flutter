@@ -1,7 +1,44 @@
+import Flutter
 import HealthKit
+
+enum HealthKitErrorCodes {
+    static let databaseInaccessible = "HEALTHKIT_DATABASE_INACCESSIBLE"
+    static let error = "HEALTHKIT_ERROR"
+    static let unknown = "HEALTHKIT_UNKNOWN_ERROR"
+}
 
 /// Utilities class containing helper methods for data manipulation
 class HealthUtilities {
+    static func flutterError(
+        _ error: Error?,
+        fallbackCode: String,
+        message: String
+    ) -> FlutterError {
+        guard let error else {
+            return FlutterError(
+                code: HealthKitErrorCodes.unknown,
+                message: message,
+                details: nil
+            )
+        }
+
+        if let healthKitError = error as? HKError,
+           healthKitError.code == .errorDatabaseInaccessible
+        {
+            return FlutterError(
+                code: HealthKitErrorCodes.databaseInaccessible,
+                message: error.localizedDescription,
+                details: nil
+            )
+        }
+
+        return FlutterError(
+            code: fallbackCode,
+            message: "\(message): \(error.localizedDescription)",
+            details: nil
+        )
+    }
+
     /// Sanitize metadata to make it Flutter-friendly
     /// - Parameter metadata: The metadata dictionary to sanitize
     /// - Returns: A dictionary with sanitized values

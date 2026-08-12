@@ -15,6 +15,20 @@ class HealthException implements Exception {
   String toString() => "Error requesting health data type '$dataType' - cause: $cause";
 }
 
+/// Error codes for iOS HealthKit [PlatformException]s thrown by this plugin.
+class HealthKitErrorCode {
+  HealthKitErrorCode._();
+
+  /// Protected HealthKit data is inaccessible, usually because the device is locked.
+  static const databaseInaccessible = 'HEALTHKIT_DATABASE_INACCESSIBLE';
+
+  /// A generic HealthKit failure.
+  static const error = 'HEALTHKIT_ERROR';
+
+  /// The native error was unavailable.
+  static const unknown = 'HEALTHKIT_UNKNOWN_ERROR';
+}
+
 /// The status of Google Health Connect.
 ///
 /// **NOTE** - The enum order is arbitrary. If you need the native value,

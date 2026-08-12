@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "cachet.plugins.health.health_example"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
