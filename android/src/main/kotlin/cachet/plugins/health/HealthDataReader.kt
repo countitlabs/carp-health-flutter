@@ -31,7 +31,8 @@ class HealthDataReader(
     private val healthConnectClient: HealthConnectClient,
     private val scope: CoroutineScope,
     private val context: Context,
-    private val dataConverter: HealthDataConverter
+    private val dataConverter: HealthDataConverter,
+    private val metadataMapper: HealthConnectMetadataMapper,
 ) {
     private val recordingFilter = HealthRecordingFilter()
 
@@ -372,11 +373,11 @@ class HealthDataReader(
             "route" to routePoints,
             "date_from" to startTimestamp,
             "date_to" to endTimestamp,
-            "source_id" to session.metadata.dataOrigin.packageName,
-            "source_name" to session.metadata.dataOrigin.packageName,
             "recording_method" to session.metadata.recordingMethod,
             "metadata" to metadata,
-        )
+        ).apply {
+            putAll(metadataMapper.fields(session.metadata))
+        }
     }
 
     private fun buildConsentRequiredRouteMap(session: ExerciseSessionRecord): Map<String, Any?> {
@@ -389,16 +390,16 @@ class HealthDataReader(
             "workout_start_time" to session.startTime.toEpochMilli(),
             "workout_end_time" to session.endTime.toEpochMilli(),
         )
-        return mapOf(
+        return mutableMapOf<String, Any?>(
             "uuid" to session.metadata.id,
             "route" to emptyList<Map<String, Any?>>(),
             "date_from" to session.startTime.toEpochMilli(),
             "date_to" to session.endTime.toEpochMilli(),
-            "source_id" to session.metadata.dataOrigin.packageName,
-            "source_name" to session.metadata.dataOrigin.packageName,
             "recording_method" to session.metadata.recordingMethod,
             "metadata" to metadata,
-        )
+        ).apply {
+            putAll(metadataMapper.fields(session.metadata))
+        }
     }
 
     /**
@@ -437,15 +438,18 @@ class HealthDataReader(
                             totalValue = totalValue.inCelsius
                         }
 
-                        val packageNames = durationResult.result.dataOrigins
-                            .joinToString { origin -> origin.packageName }
+                        val origins = durationResult.result.dataOrigins
+                        val packageNames = origins.joinToString { origin -> origin.packageName }
+                        val sourceNames = origins.joinToString { origin ->
+                            metadataMapper.sourceName(origin.packageName)
+                        }
 
                         val data = mapOf<String, Any>(
                             "value" to (totalValue ?: 0),
                             "date_from" to durationResult.startTime.toEpochMilli(),
                             "date_to" to durationResult.endTime.toEpochMilli(),
-                            "source_name" to packageNames,
-                            "source_id" to "",
+                            "source_name" to sourceNames,
+                            "source_id" to packageNames,
                             "is_manual_entry" to packageNames.contains("user_input")
                         )
                         healthConnectData.add(data)
@@ -664,7 +668,7 @@ class HealthDataReader(
 
             // Add final datapoint
             healthConnectData.add(
-                mapOf<String, Any?>(
+                mutableMapOf<String, Any?>(
                     "uuid" to record.metadata.id,
                     "activityName" to record.exerciseType.toString(),
                     "workoutActivityType" to
@@ -688,10 +692,10 @@ class HealthDataReader(
                     "unit" to "MINUTES",
                     "date_from" to record.startTime.toEpochMilli(),
                     "date_to" to record.endTime.toEpochMilli(),
-                    "source_id" to record.metadata.id,
-                    "source_name" to record.metadata.dataOrigin.packageName,
                     "recording_method" to record.metadata.recordingMethod,
-                ),
+                ).apply {
+                    putAll(metadataMapper.fields(record.metadata))
+                },
             )
         }
     }

@@ -164,6 +164,7 @@ class HealthDataPoint {
     );
     final String? uuid = dataPoint["uuid"] as String?;
     final String? deviceModel = dataPoint["device_model"] as String?;
+    final String? nativeDeviceId = dataPoint["device_id"] as String?;
 
     // Set WorkoutSummary, if available.
     WorkoutSummary? workoutSummary;
@@ -187,7 +188,7 @@ class HealthDataPoint {
       // Restore `Health().platformType` directly after removing its override.
       sourcePlatform: sourcePlatform ?? Health().platformType,
       // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END --------------------------------
-      sourceDeviceId: sourceDeviceId ?? Health().deviceId,
+      sourceDeviceId: nativeDeviceId?.isNotEmpty == true ? nativeDeviceId! : sourceDeviceId ?? Health().deviceId,
       sourceId: sourceId,
       sourceName: sourceName,
       recordingMethod: RecordingMethod.fromInt(recordingMethod),

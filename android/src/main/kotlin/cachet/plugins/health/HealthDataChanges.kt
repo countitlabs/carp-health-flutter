@@ -24,7 +24,8 @@ class HealthDataChanges(
     private val healthConnectClient: HealthConnectClient,
     private val scope: CoroutineScope,
     private val context: Context,
-    private val dataConverter: HealthDataConverter
+    private val dataConverter: HealthDataConverter,
+    private val metadataMapper: HealthConnectMetadataMapper,
 ) {
     /**
      * Creates a changes token for the requested record types.
@@ -200,7 +201,7 @@ class HealthDataChanges(
                 ?.seconds
                 ?.toDouble()
 
-        return mapOf(
+        return mutableMapOf<String, Any?>(
             "uuid" to record.metadata.id,
             "activityName" to record.exerciseType.toString(),
             "workoutActivityType" to workoutType,
@@ -215,9 +216,9 @@ class HealthDataChanges(
             "unit" to "MINUTES",
             "date_from" to record.startTime.toEpochMilli(),
             "date_to" to record.endTime.toEpochMilli(),
-            "source_id" to record.metadata.id,
-            "source_name" to record.metadata.dataOrigin.packageName,
             "recording_method" to record.metadata.recordingMethod,
-        )
+        ).apply {
+            putAll(metadataMapper.fields(record.metadata))
+        }
     }
 }

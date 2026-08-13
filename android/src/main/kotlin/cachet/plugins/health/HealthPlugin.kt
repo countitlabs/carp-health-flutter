@@ -259,8 +259,9 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
      * instances of reader, writer, operations, and converter classes.
      */
     private fun initializeHelpers() {
-        dataConverter = HealthDataConverter()
-        dataReader = HealthDataReader(healthConnectClient, scope, context!!, dataConverter)
+        val metadataMapper = HealthConnectMetadataMapper(context!!)
+        dataConverter = HealthDataConverter(metadataMapper)
+        dataReader = HealthDataReader(healthConnectClient, scope, context!!, dataConverter, metadataMapper)
         dataWriter = HealthDataWriter(healthConnectClient, scope)
         dataOperations =
                 HealthDataOperations(
@@ -269,7 +270,7 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
                         healthConnectStatus,
                         healthConnectAvailable
                 )
-        dataChanges = HealthDataChanges(healthConnectClient, scope, context!!, dataConverter)
+        dataChanges = HealthDataChanges(healthConnectClient, scope, context!!, dataConverter, metadataMapper)
     }
 
     /**

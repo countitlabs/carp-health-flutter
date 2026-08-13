@@ -16,6 +16,20 @@ void main() {
       expect(value.numericValue, 72);
     });
 
+    test('prefers the Health Connect record device over the local device fallback', () {
+      final dataPoint = HealthFixtures.numericPoint()
+        ..['device_id'] = 'Google Pixel 7 Pro';
+
+      final point = HealthDataPoint.fromHealthDataPoint(
+        HealthDataType.HEART_RATE,
+        dataPoint,
+        null,
+        sourceDeviceId: 'local-build-id',
+      );
+
+      expect(point.deviceId, 'Google Pixel 7 Pro');
+    });
+
     test('parses Health Connect elevation gained in meters', () {
       final point = HealthDataPoint.fromHealthDataPoint(
         HealthDataType.ELEVATION_GAINED,

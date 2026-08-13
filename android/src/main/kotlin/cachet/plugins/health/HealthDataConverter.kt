@@ -10,7 +10,9 @@ import androidx.health.connect.client.records.metadata.Metadata
  * Handles the transformation of strongly-typed Health Connect data into generic maps
  * that can be serialized and passed to the Flutter layer.
  */
-class HealthDataConverter {
+class HealthDataConverter(
+    private val metadataMapper: HealthConnectMetadataMapper,
+) {
     
     /**
      * Converts a Health Connect record to a list of Flutter-compatible maps.
@@ -192,13 +194,13 @@ class HealthDataConverter {
      * @param metadata Record metadata from Health Connect
      * @return MutableMap<String, Any?> Base record structure with common fields
      */
-    private fun createBaseRecord(metadata: Metadata): MutableMap<String, Any?> = mutableMapOf(
-        "uuid" to metadata.id,
-        // Journey historically used the Health Connect record metadata id as its source id.
-        "source_id" to metadata.id,
-        "source_name" to metadata.dataOrigin.packageName,
-        "recording_method" to metadata.recordingMethod
-    )
+    private fun createBaseRecord(metadata: Metadata): MutableMap<String, Any?> =
+        mutableMapOf<String, Any?>(
+            "uuid" to metadata.id,
+            "recording_method" to metadata.recordingMethod,
+        ).apply {
+            putAll(metadataMapper.fields(metadata))
+        }
 
     /**
      * Creates a specialized nutrition record with comprehensive nutrient information.
@@ -283,17 +285,17 @@ class HealthDataConverter {
         stage: SleepSessionRecord.Stage,
         dataType: String,
         metadata: Metadata
-    ): List<Map<String, Any>> {
+    ): List<Map<String, Any?>> {
         return listOf(
-            mapOf(
+            mutableMapOf<String, Any?>(
                 "uuid" to metadata.id,
                 "stage" to stage.stage,
                 "value" to ChronoUnit.MINUTES.between(stage.startTime, stage.endTime),
                 "date_from" to stage.startTime.toEpochMilli(),
                 "date_to" to stage.endTime.toEpochMilli(),
-                "source_id" to "",
-                "source_name" to metadata.dataOrigin.packageName,
-            )
+            ).apply {
+                putAll(metadataMapper.fields(metadata))
+            }
         )
     }
 
