@@ -88,12 +88,21 @@ class HealthDataReader(
 
                 authorizedTypeMap[dataType]?.let { classType ->
                     val records = mutableListOf<Record>()
+                    val limit = call.argument<Int>("limit")
 
                     // Set up the initial request to read health records
-                    var request = ReadRecordsRequest(
-                        recordType = classType,
-                        timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
-                    )
+                    var request = if (limit == null) {
+                        ReadRecordsRequest(
+                            recordType = classType,
+                            timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+                        )
+                    } else {
+                        ReadRecordsRequest(
+                            recordType = classType,
+                            timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+                            pageSize = limit,
+                        )
+                    }
 
                     var response = healthConnectClient.readRecords(request)
                     var pageToken = response.pageToken
@@ -102,12 +111,21 @@ class HealthDataReader(
                     records.addAll(response.records)
 
                     // Continue making requests while there is a page token
-                    while (!pageToken.isNullOrEmpty()) {
-                        request = ReadRecordsRequest(
-                            recordType = classType,
-                            timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
-                            pageToken = pageToken
-                        )
+                    while (!pageToken.isNullOrEmpty() && (limit == null || records.size < limit)) {
+                        request = if (limit == null) {
+                            ReadRecordsRequest(
+                                recordType = classType,
+                                timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+                                pageToken = pageToken,
+                            )
+                        } else {
+                            ReadRecordsRequest(
+                                recordType = classType,
+                                timeRangeFilter = TimeRangeFilter.between(startTime, endTime),
+                                pageSize = (limit - records.size).coerceAtLeast(1),
+                                pageToken = pageToken,
+                            )
+                        }
                         response = healthConnectClient.readRecords(request)
                         pageToken = response.pageToken
                         records.addAll(response.records)

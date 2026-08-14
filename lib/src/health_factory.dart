@@ -68,8 +68,9 @@ class HealthFactory {
   Future<List<HealthDataPoint>> getHealthDataFromTypes(
     DateTime startTime,
     DateTime endTime,
-    List<HealthDataType> types,
-  ) => _health.getHealthDataFromTypes(startTime: startTime, endTime: endTime, types: types);
+    List<HealthDataType> types, {
+    int? limit,
+  }) => _health.getHealthDataFromTypes(startTime: startTime, endTime: endTime, types: types, limit: limit);
 
   Future<int?> getTotalStepsInInterval(DateTime startTime, DateTime endTime) =>
       _health.getTotalStepsInInterval(startTime, endTime);

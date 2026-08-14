@@ -19,7 +19,7 @@ void main() {
   });
 
   group('Read APIs', () {
-    test('getHealthDataFromTypes forwards preferred units and filters', () async {
+    test('getHealthDataFromTypes forwards preferred units, filters, and limit', () async {
       ctx.channel.when('getData', [HealthFixtures.numericPoint()]);
 
       final result = await ctx.health.getHealthDataFromTypes(
@@ -28,6 +28,7 @@ void main() {
         startTime: HealthFixtures.start,
         endTime: HealthFixtures.end,
         recordingMethodsToFilter: [RecordingMethod.manual],
+        limit: 1,
       );
 
       expect(result, hasLength(1));
@@ -39,6 +40,19 @@ void main() {
       expect(args['dataTypeKey'], HealthDataType.HEART_RATE.name);
       expect(args['dataUnitKey'], HealthDataUnit.COUNT.name);
       expect(args['recordingMethodsToFilter'], [RecordingMethod.manual.toInt()]);
+      expect(args['limit'], 1);
+    });
+
+    test('getHealthDataFromTypes rejects a non-positive limit', () {
+      expect(
+        () => ctx.health.getHealthDataFromTypes(
+          types: [HealthDataType.HEART_RATE],
+          startTime: HealthFixtures.start,
+          endTime: HealthFixtures.end,
+          limit: 0,
+        ),
+        throwsArgumentError,
+      );
     });
 
     test('getHealthDataByUUID throws when UUID is empty', () {
@@ -51,10 +65,7 @@ void main() {
     test('getHealthDataByUUID forwards UUID and type', () async {
       ctx.channel.when('getDataByUUID', HealthFixtures.numericPoint());
 
-      final result = await ctx.health.getHealthDataByUUID(
-        uuid: 'uuid-1',
-        type: HealthDataType.HEART_RATE,
-      );
+      final result = await ctx.health.getHealthDataByUUID(uuid: 'uuid-1', type: HealthDataType.HEART_RATE);
 
       expect(result, isNotNull);
       expect(result!.sourceDeviceId, 'stub-ios-id');

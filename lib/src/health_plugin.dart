@@ -1181,7 +1181,11 @@ class Health {
     required DateTime startTime,
     required DateTime endTime,
     List<RecordingMethod> recordingMethodsToFilter = const [],
+    int? limit,
   }) async {
+    if (limit != null && limit <= 0) {
+      throw ArgumentError.value(limit, 'limit', 'must be greater than zero');
+    }
     await _checkIfHealthConnectAvailableOnAndroid();
     List<HealthDataPoint> dataPoints = [];
 
@@ -1192,16 +1196,19 @@ class Health {
         type,
         recordingMethodsToFilter,
         dataUnit: preferredUnits?[type],
+        limit: limit == null ? null : limit - dataPoints.length,
       );
       dataPoints.addAll(result);
+      if (limit != null && dataPoints.length >= limit) {
+        break;
+      }
     }
 
     const int threshold = 100;
-    if (dataPoints.length > threshold) {
-      return compute(removeDuplicates, dataPoints);
-    }
-
-    return removeDuplicates(dataPoints);
+    final uniqueDataPoints = dataPoints.length > threshold
+        ? await compute(removeDuplicates, dataPoints)
+        : removeDuplicates(dataPoints);
+    return limit == null || uniqueDataPoints.length <= limit ? uniqueDataPoints : uniqueDataPoints.take(limit).toList();
   }
 
   /// Fetch a list of health data points based on [types].
@@ -1309,6 +1316,7 @@ class Health {
     HealthDataType dataType,
     List<RecordingMethod> recordingMethodsToFilter, {
     HealthDataUnit? dataUnit,
+    int? limit,
   }) async {
     // Ask for device ID only once
     _deviceId ??= Platform.isAndroid
@@ -1325,7 +1333,7 @@ class Health {
     if (dataType == HealthDataType.BODY_MASS_INDEX && Platform.isAndroid) {
       return _computeAndroidBMI(startTime, endTime, recordingMethodsToFilter);
     }
-    return await _dataQuery(startTime, endTime, dataType, recordingMethodsToFilter, dataUnit: dataUnit);
+    return await _dataQuery(startTime, endTime, dataType, recordingMethodsToFilter, dataUnit: dataUnit, limit: limit);
   }
 
   /// Prepares an interval query, i.e. checks if the types are available, etc.
@@ -1381,6 +1389,7 @@ class Health {
     HealthDataType dataType,
     List<RecordingMethod> recordingMethodsToFilter, {
     HealthDataUnit? dataUnit,
+    int? limit,
   }) async {
     String? unit = dataUnit?.name ?? dataTypeToUnit[dataType]?.name;
     final args = <String, dynamic>{
@@ -1389,6 +1398,7 @@ class Health {
       'startTime': startTime.millisecondsSinceEpoch,
       'endTime': endTime.millisecondsSinceEpoch,
       'recordingMethodsToFilter': recordingMethodsToFilter.map((e) => e.toInt()).toList(),
+      if (limit != null) 'limit': limit,
     };
     final fetchedDataPoints = await _channel.invokeMethod('getData', args);
 
