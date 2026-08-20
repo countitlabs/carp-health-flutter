@@ -419,10 +419,11 @@ class WorkoutRouteHealthValue extends HealthValue {
     final rawRoute = (dataPoint['route'] as List<dynamic>? ?? [])
         .map((entry) => Map<String, dynamic>.from(entry as Map))
         .toList();
+    final metadata = dataPoint['metadata'] as Map?;
 
     return WorkoutRouteHealthValue(
       locations: rawRoute.map(WorkoutRouteLocation.fromHealthDataPoint).toList(),
-      workoutUuid: dataPoint['workout_uuid'] as String?,
+      workoutUuid: dataPoint['workout_uuid'] as String? ?? metadata?['workout_uuid'] as String?,
     );
   }
 

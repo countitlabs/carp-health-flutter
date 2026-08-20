@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health/health.dart';
 
@@ -75,6 +77,39 @@ void main() {
       expect(args['uuid'], 'uuid-1');
       expect(args['dataTypeKey'], HealthDataType.HEART_RATE.name);
     });
+
+    test(
+      'getWorkoutRoute reads the route from a Health Connect exercise session',
+      () async {
+        final nativeRoute = HealthFixtures.workoutRoutePoint()..remove('workout_uuid');
+        ctx.channel.when('getDataByUUID', nativeRoute);
+
+        final route = await ctx.health.getWorkoutRoute('workout-uuid-1');
+
+        expect(route, isNotNull);
+        expect(route!.workoutUuid, 'workout-uuid-1');
+        expect(route.locations, hasLength(1));
+        expect(route.locations.single.latitude, 37.3349);
+        expect(route.locations.single.longitude, -122.0090);
+
+        final call = ctx.channel.lastCallFor('getDataByUUID');
+        expect(call, isNotNull);
+        final args = Map<String, dynamic>.from(call!.arguments as Map);
+        expect(args['uuid'], 'workout-uuid-1');
+        expect(args['dataTypeKey'], HealthDataType.WORKOUT_ROUTE.name);
+      },
+      skip: Platform.isIOS ? 'HealthKit uses the iOS workout route method' : null,
+    );
+
+    test(
+      'getWorkoutRoute returns null when Health Connect has no accessible route',
+      () async {
+        ctx.channel.when('getDataByUUID', {...HealthFixtures.workoutRoutePoint(), 'route': <Map<String, dynamic>>[]});
+
+        expect(await ctx.health.getWorkoutRoute('workout-uuid-1'), isNull);
+      },
+      skip: Platform.isIOS ? 'HealthKit uses the iOS workout route method' : null,
+    );
 
     test('getHealthIntervalDataFromTypes forwards interval query', () async {
       ctx.channel.when('getIntervalData', [HealthFixtures.numericPoint()]);

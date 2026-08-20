@@ -1540,13 +1540,19 @@ class Health {
     });
   }
 
-  /// Gets the GPS route associated with an exact HealthKit workout UUID.
+  /// Gets the GPS route associated with an exact workout UUID.
+  ///
+  /// On Android, the route is read from the Health Connect exercise session.
+  /// Third-party routes are returned only when Health Connect grants route access.
   Future<WorkoutRouteHealthValue?> getWorkoutRoute(String workoutUuid) async {
-    if (!Platform.isIOS) {
-      throw UnsupportedError('getWorkoutRoute is only supported on iOS');
+    if (Platform.isIOS) {
+      final route = await _channel.invokeMapMethod<String, dynamic>('getWorkoutRoute', {'workoutUUID': workoutUuid});
+      return route == null ? null : WorkoutRouteHealthValue.fromHealthDataPoint(route);
     }
-    final route = await _channel.invokeMapMethod<String, dynamic>('getWorkoutRoute', {'workoutUUID': workoutUuid});
-    return route == null ? null : WorkoutRouteHealthValue.fromJson(route);
+
+    final point = await getHealthDataByUUID(uuid: workoutUuid, type: HealthDataType.WORKOUT_ROUTE);
+    final value = point?.value;
+    return value is WorkoutRouteHealthValue && value.locations.isNotEmpty ? value : null;
   }
 
   /// Assigns numbers to specific [HealthDataType]s.

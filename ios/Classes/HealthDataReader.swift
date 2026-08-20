@@ -831,7 +831,7 @@ class HealthDataReader {
 
         let sampleType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
         var predicate = HKQuery.predicateForSamples(
-            withStart: dateFrom, end: dateTo, options: .strictStartDate
+            withStart: dateFrom, end: dateTo
         )
         if !includeManualEntry {
             let manualPredicate = NSPredicate(
