@@ -10,7 +10,9 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.annotation.NonNull
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import androidx.health.connect.client.contracts.ExerciseRouteRequestContract
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.ExerciseRoute
 // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ------------------------------------
 import cachet.plugins.health.googlefit.GoogleFitPlugin
 // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END --------------------------------------
@@ -41,6 +43,7 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
     private var activity: Activity? = null
     private var context: Context? = null
     private var healthConnectRequestPermissionsLauncher: ActivityResultLauncher<Set<String>>? = null
+    private var exerciseRouteRequestLauncher: ActivityResultLauncher<String>? = null
     private lateinit var healthConnectClient: HealthConnectClient
     private lateinit var scope: CoroutineScope
     private var isReplySubmitted = false
@@ -160,8 +163,11 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
                     dataOperations.isHealthDataInBackgroundAvailable(call, result)
             "isHealthDataInBackgroundAuthorized" ->
                     dataOperations.isHealthDataInBackgroundAuthorized(call, result)
+            "isExerciseRoutesAuthorized" ->
+                    dataOperations.isExerciseRoutesAuthorized(call, result)
             "requestHealthDataInBackgroundAuthorization" ->
                     requestHealthDataInBackgroundAuthorization(call, result)
+            "requestExerciseRoute" -> requestExerciseRoute(call, result)
             "isSkinTemperatureAvailable" ->
                     dataOperations.isSkinTemperatureAvailable(call, result)
 
@@ -220,6 +226,11 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
                 (activity as ComponentActivity).registerForActivityResult(
                         requestPermissionActivityContract
                 ) { granted -> onHealthConnectPermissionCallback(granted) }
+
+        exerciseRouteRequestLauncher =
+                (activity as ComponentActivity).registerForActivityResult(
+                        ExerciseRouteRequestContract()
+                ) { route -> onExerciseRouteRequestCallback(route) }
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
@@ -240,6 +251,7 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
         }
         activity = null
         healthConnectRequestPermissionsLauncher = null
+        exerciseRouteRequestLauncher = null
         // GOOGLE FIT TEMPORARY SUPPORT - REMOVE START ----------------------------
         googleFitPlugin.onDetachedFromActivity()
         // GOOGLE FIT TEMPORARY SUPPORT - REMOVE END ------------------------------
@@ -372,6 +384,63 @@ class HealthPlugin(private var channel: MethodChannel? = null) :
         healthConnectRequestPermissionsLauncher!!.launch(
                 setOf(HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY)
         )
+    }
+
+    /**
+     * Launches Health Connect's per-route consent dialog for the given exercise session. This is
+     * the only app-initiated path to route access: READ_EXERCISE_ROUTES cannot be requested through
+     * the standard permission dialog, but "Allow all" in this dialog grants it.
+     *
+     * @param call Method call containing 'sessionUuid' of an exercise session with a pending route
+     * @param result Flutter result callback returning the route points, or null
+     */
+    private fun requestExerciseRoute(call: MethodCall, result: Result) {
+        if (context == null || exerciseRouteRequestLauncher == null) {
+            result.success(false)
+            Log.i("FLUTTER_HEALTH", "Exercise route launcher not found")
+            return
+        }
+
+        val sessionUuid = call.argument<String>("sessionUuid")
+        if (sessionUuid.isNullOrEmpty()) {
+            result.success(null)
+            return
+        }
+
+        mResult = result
+        isReplySubmitted = false
+        exerciseRouteRequestLauncher!!.launch(sessionUuid)
+    }
+
+    /**
+     * Handles the per-route consent dialog result. Returns the granted route's points to Flutter,
+     * or null when the user declined or no route was returned.
+     *
+     * @param route Route granted by the user, or null
+     */
+    private fun onExerciseRouteRequestCallback(route: ExerciseRoute?) {
+        if (isReplySubmitted) {
+            return
+        }
+        if (route == null) {
+            mResult?.success(null)
+            Log.i("FLUTTER_HEALTH", "Exercise route access was not granted")
+        } else {
+            val points = route.route.map { location ->
+                mutableMapOf<String, Any?>(
+                        "latitude" to location.latitude,
+                        "longitude" to location.longitude,
+                        "timestamp" to location.time.toEpochMilli(),
+                ).apply {
+                    location.altitude?.let { put("altitude", it.inMeters) }
+                    location.horizontalAccuracy?.let { put("horizontalAccuracy", it.inMeters) }
+                    location.verticalAccuracy?.let { put("verticalAccuracy", it.inMeters) }
+                }
+            }
+            mResult?.success(points)
+            Log.i("FLUTTER_HEALTH", "Exercise route granted with ${points.size} points")
+        }
+        isReplySubmitted = true
     }
 
     /**

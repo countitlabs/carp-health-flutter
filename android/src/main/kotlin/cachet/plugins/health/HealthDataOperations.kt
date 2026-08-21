@@ -172,6 +172,24 @@ class HealthDataOperations(
     }
 
     /**
+     * Checks whether the read-all-exercise-routes permission is granted. Kept out of the bulk
+     * permission list so it can be requested on Health Connect's dedicated routes screen.
+     *
+     * @param call Method call from Flutter (unused)
+     * @param result Flutter result callback returning boolean authorization status
+     */
+    fun isExerciseRoutesAuthorized(call: MethodCall, result: Result) {
+        scope.launch {
+            result.success(
+                    healthConnectClient
+                            .permissionController
+                            .getGrantedPermissions()
+                            .contains(HealthPermission.PERMISSION_READ_EXERCISE_ROUTES),
+            )
+        }
+    }
+
+    /**
      * Checks if Skin Temperature data is available on the current device.
      * Availability is device-specific and exposed via Health Connect features.
      *

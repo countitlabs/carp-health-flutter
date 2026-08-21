@@ -80,6 +80,11 @@ class HealthFactory {
 
   Future<WorkoutRouteHealthValue?> getWorkoutRoute(String workoutUuid) => _health.getWorkoutRoute(workoutUuid);
 
+  Future<bool> isExerciseRoutesAuthorized() => _health.isExerciseRoutesAuthorized();
+
+  Future<(bool presented, List<WorkoutRouteLocation>? locations)> requestExerciseRoute(String sessionUuid) =>
+      _health.requestExerciseRoute(sessionUuid);
+
   Future<bool> writeHealthData(
     double value,
     HealthDataType type,

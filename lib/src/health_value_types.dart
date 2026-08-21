@@ -413,7 +413,12 @@ class WorkoutRouteHealthValue extends HealthValue {
   List<WorkoutRouteLocation> locations;
   String? workoutUuid;
 
-  WorkoutRouteHealthValue({required this.locations, this.workoutUuid});
+  /// True when the session has a route but reading it requires per-route user
+  /// consent (Health Connect returned ExerciseRouteResult.ConsentRequired).
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  bool routeRequiresConsent;
+
+  WorkoutRouteHealthValue({required this.locations, this.workoutUuid, this.routeRequiresConsent = false});
 
   factory WorkoutRouteHealthValue.fromHealthDataPoint(dynamic dataPoint) {
     final rawRoute = (dataPoint['route'] as List<dynamic>? ?? [])
@@ -424,6 +429,7 @@ class WorkoutRouteHealthValue extends HealthValue {
     return WorkoutRouteHealthValue(
       locations: rawRoute.map(WorkoutRouteLocation.fromHealthDataPoint).toList(),
       workoutUuid: dataPoint['workout_uuid'] as String? ?? metadata?['workout_uuid'] as String?,
+      routeRequiresConsent: metadata?['route_requires_consent'] as bool? ?? false,
     );
   }
 

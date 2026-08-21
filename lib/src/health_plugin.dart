@@ -358,6 +358,49 @@ class Health {
     }
   }
 
+  /// Checks whether the read-all-exercise-routes permission is granted.
+  ///
+  /// Android only. Returns true on iOS or false if an error occurs.
+  Future<bool> isExerciseRoutesAuthorized() async {
+    if (Platform.isIOS) return true;
+
+    try {
+      final status = await _channel.invokeMethod<bool>('isExerciseRoutesAuthorized');
+      return status ?? false;
+    } catch (e) {
+      debugPrint('$runtimeType - Exception in isExerciseRoutesAuthorized(): $e');
+      return false;
+    }
+  }
+
+  /// Launches Health Connect's per-route consent dialog for [sessionUuid].
+  ///
+  /// This is the only app-initiated path to route access: READ_EXERCISE_ROUTES
+  /// cannot be requested through the standard permission dialog, but choosing
+  /// "Allow all" in this dialog grants it.
+  ///
+  /// Returns whether the dialog could be presented, and the granted route's
+  /// locations (null when the user declined). `presented` is false when no
+  /// Activity is attached (e.g. background isolates), so callers can retry.
+  /// Android only. Returns (false, null) on iOS or if an error occurs.
+  Future<(bool presented, List<WorkoutRouteLocation>? locations)> requestExerciseRoute(String sessionUuid) async {
+    if (Platform.isIOS) return (false, null);
+
+    await _checkIfHealthConnectAvailableOnAndroid();
+    try {
+      final result = await _channel.invokeMethod('requestExerciseRoute', {'sessionUuid': sessionUuid});
+      if (result == false) return (false, null);
+      if (result is! List) return (true, null);
+      final locations = result
+          .map((entry) => WorkoutRouteLocation.fromHealthDataPoint(Map<String, dynamic>.from(entry as Map)))
+          .toList();
+      return (true, locations);
+    } catch (e) {
+      debugPrint('$runtimeType - Exception in requestExerciseRoute(): $e');
+      return (false, null);
+    }
+  }
+
   /// Checks whether Skin Temperature is available on this Android device.
   ///
   /// Android only. Returns false on iOS or if an error occurs.
@@ -1552,7 +1595,8 @@ class Health {
 
     final point = await getHealthDataByUUID(uuid: workoutUuid, type: HealthDataType.WORKOUT_ROUTE);
     final value = point?.value;
-    return value is WorkoutRouteHealthValue && value.locations.isNotEmpty ? value : null;
+    if (value is! WorkoutRouteHealthValue) return null;
+    return value.locations.isNotEmpty || value.routeRequiresConsent ? value : null;
   }
 
   /// Assigns numbers to specific [HealthDataType]s.
